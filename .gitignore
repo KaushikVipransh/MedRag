@@ -1,0 +1,16 @@
+# secrets
+.env
+# copyrighted / personal documents
+*.pdf
+# generated data
+data/chroma/
+data/feedback.jsonl
+data/eval_cache/
+# environments
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+# executor scratch
+.superpowers/
