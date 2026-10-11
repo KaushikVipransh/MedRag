@@ -30,11 +30,26 @@ def find_repeating_margin_lines(
     pages: list[list[str]], margin: int = 3, min_count: int = 4
 ) -> set[str]:
     """Normalised lines (digits -> '#') that sit in the top/bottom `margin` lines of at
-    least `min_count` pages: running headers, footers and bare page numbers."""
-    counts: Counter[str] = Counter()
+    least `min_count` pages: running headers, footers and bare page numbers. Lines that
+    also occur in page bodies (recurring sub-headings like "Treatment") are kept as
+    content unless they contain no letters."""
+    margin_counts: Counter[str] = Counter()
+    body_counts: Counter[str] = Counter()
     for lines in pages:
-        counts.update({_norm(l) for l in _margin(lines, margin) if l.strip() and len(l) <= 80})
-    return {line for line, n in counts.items() if n >= min_count}
+        n = len(lines)
+        in_margin: set[str] = set()
+        in_body: set[str] = set()
+        for i, line in enumerate(lines):
+            if not line.strip() or len(line) > 80:
+                continue
+            (in_margin if i < margin or i >= n - margin else in_body).add(_norm(line))
+        margin_counts.update(in_margin)
+        body_counts.update(in_body)
+    return {
+        line
+        for line, n in margin_counts.items()
+        if n >= min_count and (not any(c.isalpha() for c in line) or body_counts[line] * 4 < n)
+    }
 
 
 def strip_margin_lines(lines: list[str], repeating: set[str], margin: int = 3) -> list[str]:

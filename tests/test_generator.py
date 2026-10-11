@@ -63,3 +63,8 @@ def test_llm_failure_becomes_friendly_answer():
     assert ans.refused and ans.refusal_reason == "llm_error"
     assert "try again" in ans.text.lower()
     assert any("RateLimitError" in w for w in ans.warnings)
+
+
+def test_empty_llm_output_is_an_llm_error():
+    ans = Generator(FakeLLM(["   "])).generate("q", chunks())
+    assert ans.refused and ans.refusal_reason == "llm_error"

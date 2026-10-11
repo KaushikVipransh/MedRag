@@ -74,3 +74,18 @@ def test_title_defaults_to_filename(tmp_path, store):
     make_pdf(pdf, [EAR_1, EAR_2, NOSE_1, NOSE_2])
     stats = ingest_pdf(pdf, store, FakeEmbedder(), 50, 10)
     assert stats.title == "My Ent Book"
+
+
+def test_watermarked_image_only_page_is_reported(tmp_path, store):
+    pdf = tmp_path / "scan.pdf"
+    doc = pymupdf.open()
+    for n, body in enumerate([EAR_1, EAR_2, NOSE_1, NOSE_2, ""]):
+        page = doc.new_page()
+        page.insert_text((72, 60), "Test Book of ENT")
+        if body:
+            page.insert_text((72, 120), body)
+        page.insert_text((72, 820), "mebooksfree.com")
+    doc.save(str(pdf))
+    doc.close()
+    stats = ingest_pdf(pdf, store, FakeEmbedder(), 50, 10)
+    assert stats.pages_without_text == 1

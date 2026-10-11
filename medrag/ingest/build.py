@@ -42,17 +42,22 @@ def build_chunks(
     max_tokens: int,
     overlap_tokens: int,
     min_chars: int = 40,
-) -> tuple[list[Chunk], int]:
+) -> tuple[list[Chunk], int, int]:
+    """Returns (chunks, pages_indexed, pages_without_text). A page is "without text"
+    when nothing usable remains after removing headers, footers and watermarks, which
+    is how image-only (scanned) pages look even when they carry a text overlay."""
     labels = infer_page_labels(pages_lines, pdf_labels)
     repeating = find_repeating_margin_lines(pages_lines)
     chunks: list[Chunk] = []
     pages_indexed = 0
+    pages_without_text = 0
     for i, lines in enumerate(pages_lines):
         body = strip_margin_lines(lines, repeating)
-        if is_non_content_page(body):
-            continue
         text = lines_to_text(body)
         if len(text) < 100:
+            pages_without_text += 1
+            continue
+        if is_non_content_page(body):
             continue
         pieces = [p for p in chunk_text(text, count_tokens, max_tokens, overlap_tokens) if len(p) >= min_chars]
         if pieces:
@@ -69,7 +74,7 @@ def build_chunks(
                     section=sections[i],
                 )
             )
-    return chunks, pages_indexed
+    return chunks, pages_indexed, pages_without_text
 
 
 def ingest_pdf(
@@ -88,7 +93,7 @@ def ingest_pdf(
     sections = (
         sections_from_toc(raw.toc, n_pages) if raw.toc else sections_from_fonts(read_font_lines(path))
     )
-    chunks, pages_indexed = build_chunks(
+    chunks, pages_indexed, pages_without_text = build_chunks(
         doc_id, title, raw.pages_lines, raw.pdf_labels, sections,
         embedder.count_tokens, max_tokens, overlap_tokens,
     )
@@ -100,6 +105,6 @@ def ingest_pdf(
         title=title,
         pages_total=n_pages,
         pages_indexed=pages_indexed,
-        pages_without_text=sum(1 for lines in raw.pages_lines if not "".join(lines).strip()),
+        pages_without_text=pages_without_text,
         chunks=len(chunks),
     )

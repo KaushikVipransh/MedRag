@@ -29,6 +29,11 @@ class Generator:
                 chunks=chunks, warnings=[str(exc)],
             )
 
+        if not raw.strip():
+            return Answer(
+                text=LLM_UNAVAILABLE_MESSAGE, refused=True, refusal_reason="llm_error",
+                chunks=chunks, warnings=["empty response from language model"],
+            )
         if is_refusal(raw):
             return Answer(text=NOT_FOUND_MESSAGE, refused=True, refusal_reason="not_in_context", chunks=chunks)
 

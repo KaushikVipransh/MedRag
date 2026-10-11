@@ -3,9 +3,16 @@ from medrag.conversation import condense_question
 from medrag.generation.generator import Generator
 from medrag.generation.llm import LLMClient
 from medrag.generation.prompts import NOT_FOUND_MESSAGE
+from medrag.retrieval.bm25 import tokenize
 from medrag.retrieval.retriever import HybridRetriever
 from medrag.safety import is_emergency, validate_question
 from medrag.types import Answer
+
+VAGUE_QUESTION_MESSAGE = "Please ask a specific question about the book, for example: What causes tinnitus?"
+
+
+def _has_searchable_words(text: str) -> bool:
+    return any(any(ch.isalpha() for ch in token) for token in tokenize(text))
 
 
 class MedRAG:
@@ -23,6 +30,11 @@ class MedRAG:
             return Answer(text=error, refused=True, refusal_reason="invalid_input")
 
         standalone = condense_question(self.llm, clean, history or [])
+        if not _has_searchable_words(standalone):
+            return Answer(
+                text=VAGUE_QUESTION_MESSAGE, refused=True, refusal_reason="invalid_input",
+                standalone_question=standalone, emergency=is_emergency(clean),
+            )
         chunks = self.retriever.retrieve(standalone, doc_ids)
 
         best = chunks[0].rerank_score if chunks else None

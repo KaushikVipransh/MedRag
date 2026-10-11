@@ -80,3 +80,16 @@ def test_page_mentioning_index_in_prose_is_content():
 
 def test_empty_page_is_non_content():
     assert is_non_content_page([" ", ""])
+
+
+def test_recurring_subheading_that_also_appears_in_body_is_not_a_header():
+    margin_pages = [[HEADER, f"body {i}", "more", "Treatment"] for i in range(5)]
+    body_pages = [["a", "b", "c", "Treatment", "x", "y", "z"] for _ in range(3)]
+    rep = find_repeating_margin_lines(margin_pages + body_pages)
+    assert "treatment" not in rep
+    assert HEADER.lower() in rep
+
+
+def test_bare_page_numbers_are_headers_even_if_numbers_appear_in_tables():
+    pages = [["Title line", f"text {i}", "x", "y", "12", "34", "56", "a", "b", str(i + 1)] for i in range(6)]
+    assert "#" in find_repeating_margin_lines(pages)

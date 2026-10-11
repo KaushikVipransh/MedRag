@@ -49,7 +49,7 @@ def test_low_relevance_refuses_without_calling_llm(tmp_path):
 
 def test_question_without_searchable_words_does_not_crash(tmp_path):
     ans = make_rag(tmp_path, FakeLLM()).answer("???")
-    assert ans.refused and ans.refusal_reason == "low_relevance"
+    assert ans.refused and ans.refusal_reason == "invalid_input"
 
 
 def test_follow_up_uses_condensed_question(tmp_path):
@@ -72,3 +72,19 @@ def test_emergency_flag_is_set(tmp_path):
 def test_build_pipeline_fails_fast_on_empty_index(tmp_path):
     with pytest.raises(RuntimeError, match="python -m medrag.ingest"):
         build_pipeline(Settings(chroma_dir=tmp_path / "empty"))
+
+
+def test_question_with_only_stopwords_is_refused_deterministically(tmp_path):
+    llm = FakeLLM()
+    rag = make_rag(tmp_path, llm, reranker=FixedReranker({"Tinnitus": 0.9}))
+    for q in ("what is it?", "1"):
+        ans = rag.answer(q)
+        assert ans.refused and ans.refusal_reason == "invalid_input"
+    assert llm.calls == []
+
+
+def test_stopword_follow_up_with_history_is_condensed_not_refused(tmp_path):
+    llm = FakeLLM(["What is tinnitus?", "Tinnitus is a ringing sound [1]."])
+    history = [{"role": "user", "content": "Tell me about tinnitus"}, {"role": "assistant", "content": "Sure [1]."}]
+    ans = make_rag(tmp_path, llm).answer("what is it?", history=history)
+    assert not ans.refused
