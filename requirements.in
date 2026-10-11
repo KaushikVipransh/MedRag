@@ -1,0 +1,10 @@
+pymupdf
+chromadb
+sentence-transformers
+transformers
+torch
+rank-bm25
+groq
+python-dotenv
+streamlit
+pytest
