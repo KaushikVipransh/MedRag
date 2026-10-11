@@ -11,8 +11,12 @@ def _unique(items: Iterable[str]) -> list[str]:
     return out
 
 
+# All metrics rank unique pages (duplicate chunks from one page collapse to its first
+# occurrence) and cut at k unique pages.
+
+
 def recall_at_k(pages: list[str], gold: set[str], k: int) -> float:
-    return 1.0 if set(pages[:k]) & gold else 0.0
+    return 1.0 if set(_unique(pages)[:k]) & gold else 0.0
 
 
 def reciprocal_rank(pages: list[str], gold: set[str]) -> float:
@@ -23,7 +27,7 @@ def reciprocal_rank(pages: list[str], gold: set[str]) -> float:
 
 
 def ndcg_at_k(pages: list[str], gold: set[str], k: int) -> float:
-    ranking = _unique(pages[:k])
+    ranking = _unique(pages)[:k]
     dcg = sum(1.0 / math.log2(r + 1) for r, p in enumerate(ranking, start=1) if p in gold)
     idcg = sum(1.0 / math.log2(r + 1) for r in range(1, min(len(gold), k) + 1))
     return dcg / idcg if idcg else 0.0

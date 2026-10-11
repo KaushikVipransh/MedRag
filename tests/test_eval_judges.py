@@ -58,3 +58,12 @@ def test_baseline_answer_refusal_and_error():
     assert failed.refused and failed.refusal_reason == "llm_error"
     empty = NoRagBaseline(FakeLLM(["  "])).answer("q")
     assert empty.refusal_reason == "llm_error"
+
+
+def test_support_claims_with_non_boolean_flags_are_rejected():
+    bad = '{"claims": [{"claim": "a", "cited": [1], "supported_by_cited": "false", "supported_by_any": "false"}]}'
+    assert not judge_support(FakeLLM([bad]), "a [1].", CHUNKS).ok
+
+
+def test_support_claims_that_are_not_objects_are_rejected():
+    assert not judge_support(FakeLLM(['{"claims": ["a claim"]}']), "a.", CHUNKS).ok

@@ -37,3 +37,9 @@ def test_report_writes_markdown(env):
     main(["report"])
     reports = list((env / "reports").glob("*evaluation-DRAFT.md"))
     assert len(reports) == 1 and "| rrf_rerank |" in reports[0].read_text(encoding="utf-8")
+
+
+def test_all_requires_verified_items(env):
+    save_gold(env / "gold.jsonl", [GoldItem("in-001", "in_scope", "q", "answer")])
+    with pytest.raises(SystemExit, match="review_gold.py"):
+        main(["all"])

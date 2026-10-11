@@ -61,8 +61,15 @@ def judge_support(llm: LLMClient, answer: str, chunks: list[RetrievedChunk]) -> 
     if not chunks:
         return Judgement(False, {}, "no passages to check against")
     j = _ask(llm, SUPPORT_SYSTEM, f"Passages:\n\n{format_sources(chunks)}\n\nAnswer:\n{answer}")
-    if j.ok and not isinstance(j.data.get("claims"), list):
+    if not j.ok:
+        return j
+    claims = j.data.get("claims")
+    if not isinstance(claims, list):
         return Judgement(False, j.data, "claims missing or not a list")
+    for c in claims:
+        if not (isinstance(c, dict) and isinstance(c.get("supported_by_any"), bool)
+                and isinstance(c.get("supported_by_cited"), bool) and isinstance(c.get("cited", []), list)):
+            return Judgement(False, j.data, f"malformed claim {c!r}")
     return j
 
 

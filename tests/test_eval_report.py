@@ -45,3 +45,36 @@ def test_render_report_marks_drafts_and_formats_values():
 def test_render_report_without_draft_banner():
     md = render_report({"date": "d", "generator": "g", "judge": "j", "unverified_included": False, "gold_counts": {}})
     assert not md.startswith("> **DRAFT**") and md.startswith("# MedRAG evaluation")
+
+
+def test_judge_errors_do_not_count_as_wrong_answers():
+    rows = [r("i1", "in_scope", correctness="correct"),
+            r("i2", "in_scope", correctness=None, judge_errors=["correctness: judge returned no JSON"])]
+    s = summarize_system(rows)
+    assert s["correct_overall"] == 1.0 and s["graded"] == 1 and s["judge_errors"] == 1
+
+
+def test_citation_hit_and_refusal_precision():
+    rows = [r("i1", "in_scope", correctness="correct", cited_pages=["160"], gold_pages=["160"]),
+            r("i2", "in_scope", correctness="correct", cited_pages=["99"], gold_pages=["160"]),
+            r("i3", "in_scope", refused=True),
+            r("o1", "out_of_scope", refused=True, handled_ok=True),
+            r("o2", "out_of_scope", refused=True, handled_ok=True),
+            r("n1", "near_miss", refused=True, handled_ok=True)]
+    s = summarize_system(rows)
+    assert s["citation_hit"] == 0.5
+    assert s["refusal_precision"] == 0.75
+
+
+def test_paired_book_support_uses_items_both_systems_answered():
+    from medrag.eval.report import paired_book_support
+
+    a = [r("i1", "in_scope", book_support=1.0), r("i2", "in_scope", refused=True)]
+    b = [r("i1", "in_scope", book_support=0.5), r("i2", "in_scope", book_support=0.2)]
+    assert paired_book_support(a, b) == (1.0, 0.5, 1)
+
+
+def test_report_has_no_latency_column_and_shows_counts():
+    md = render_report({"date": "d", "generator": "g", "judge": "j", "unverified_included": False, "gold_counts": {}},
+                       systems={"medrag": summarize_system(RESULTS)})
+    assert "latency" not in md.lower() and "judge errors" in md and "graded" in md

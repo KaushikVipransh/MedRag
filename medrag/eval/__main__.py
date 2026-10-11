@@ -10,7 +10,7 @@ from medrag.eval.calibrate import choose_threshold, rates, split_dev_test
 from medrag.eval.config import EvalSettings
 from medrag.eval.consistency import consistency_scores
 from medrag.eval.gold import load_gold, save_evidence, save_gold, select
-from medrag.eval.report import render_report, summarize_system
+from medrag.eval.report import paired_book_support, render_report, summarize_system
 
 UNVERIFIED_HELP = (
     "No verified gold items. Verify them with: streamlit run review_gold.py "
@@ -108,11 +108,20 @@ def cmd_run(args, settings, cfg):
         return memo[question]
 
     systems = {"medrag": rag, "no_rag": NoRagBaseline(gen, settings.temperature)}
-    summaries = {}
+    config = (f"generator={settings.llm_model};judge={cfg.judge_model};threshold={settings.rerank_threshold};"
+              f"top_n={settings.top_n};candidates={settings.candidates_per_retriever}")
+    summaries, all_results = {}, {}
     for name in args.systems.split(","):
-        results = run_system(items, name, systems[name], judge, passages_for, cfg.results_dir / f"{name}.jsonl")
+        results = run_system(items, name, systems[name], judge, passages_for,
+                             cfg.results_dir / f"{name}.jsonl", config=config)
+        all_results[name] = results
         summaries[name] = summarize_system(results)
-    _write_json(cfg, "summary.json", {"meta": _meta(settings, cfg, items, args), "systems": summaries})
+    paired = None
+    if {"medrag", "no_rag"} <= set(all_results):
+        a, b, n = paired_book_support(all_results["medrag"], all_results["no_rag"])
+        paired = {"medrag": a, "no_rag": b, "n": n}
+    _write_json(cfg, "summary.json",
+                {"meta": _meta(settings, cfg, items, args), "systems": summaries, "paired_book_support": paired})
     print(json.dumps(summaries, indent=2))
 
 
@@ -175,12 +184,27 @@ def cmd_report(args, settings, cfg):
         retrieval=loaded.get("retrieval", {}).get("variants"),
         calibration=loaded.get("calibration", {}).get("calibration"),
         consistency=loaded.get("consistency", {}).get("consistency"),
+        paired=loaded.get("summary", {}).get("paired_book_support"),
     )
     cfg.report_dir.mkdir(parents=True, exist_ok=True)
     suffix = "-DRAFT" if meta["unverified_included"] else ""
     out = cfg.report_dir / f"{meta['date']}-evaluation{suffix}.md"
     out.write_text(md + "\n", encoding="utf-8")
     print(f"Wrote {out}")
+
+
+def cmd_all(args, settings, cfg):
+    """Run every stage in order with default options, then write the report."""
+    flag = args.include_unverified
+    stages = [
+        (cmd_retrieval, argparse.Namespace(include_unverified=flag, collections=args.collections)),
+        (cmd_calibrate, argparse.Namespace(include_unverified=flag, min_pass=0.98)),
+        (cmd_run, argparse.Namespace(include_unverified=flag, systems="medrag,no_rag", limit=None)),
+        (cmd_consistency, argparse.Namespace(include_unverified=flag, limit=20, repeats=3)),
+        (cmd_report, argparse.Namespace()),
+    ]
+    for stage, stage_args in stages:
+        stage(stage_args, settings, cfg)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -204,12 +228,15 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--limit", type=int, default=20)
     p.add_argument("--repeats", type=int, default=3)
     sub.add_parser("report", help="write the markdown report from saved results")
+    p = sub.add_parser("all", help="retrieval, calibrate, run, consistency, then report")
+    p.add_argument("--include-unverified", action="store_true")
+    p.add_argument("--collections", default="medrag,medrag_t128,medrag_t300")
 
     args = parser.parse_args(argv)
     settings, cfg = Settings.from_env(), EvalSettings.from_env()
     {
         "draft": cmd_draft, "retrieval": cmd_retrieval, "run": cmd_run,
-        "calibrate": cmd_calibrate, "consistency": cmd_consistency, "report": cmd_report,
+        "calibrate": cmd_calibrate, "consistency": cmd_consistency, "report": cmd_report, "all": cmd_all,
     }[args.command](args, settings, cfg)
 
 

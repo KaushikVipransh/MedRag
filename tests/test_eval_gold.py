@@ -39,3 +39,11 @@ def test_evidence_roundtrip(tmp_path):
     save_evidence(tmp_path / "e.jsonl", ev)
     assert load_evidence(tmp_path / "e.jsonl") == ev
     assert load_evidence(tmp_path / "missing.jsonl") == {}
+
+
+def test_parse_pages_flags_unknown_labels():
+    from medrag.eval.gold import parse_pages
+
+    assert parse_pages(" 146, 147 ,", {"146", "147"}) == (["146", "147"], [])
+    assert parse_pages("146-147, p. 146", {"146", "147"}) == (["146-147", "p. 146"], ["146-147", "p. 146"])
+    assert parse_pages("146", set()) == (["146"], [])  # no index available: nothing to check against

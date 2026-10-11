@@ -45,3 +45,10 @@ def test_score_retriever_skips_items_without_gold_pages():
     scores = score_retriever(FixedRetriever(["10", "12"]), items)
     assert scores["n"] == 1
     assert scores["recall@1"] == 0.0 and scores["recall@5"] == 1.0 and scores["mrr"] == 0.5
+
+
+def test_all_metrics_rank_unique_pages_consistently():
+    pages, gold = ["191", "172", "191", "155", "191"], {"155"}
+    assert recall_at_k(pages, gold, 3) == 1.0  # third unique page
+    assert reciprocal_rank(pages, gold) == pytest.approx(1 / 3)
+    assert ndcg_at_k(pages, gold, 3) == pytest.approx(0.5)

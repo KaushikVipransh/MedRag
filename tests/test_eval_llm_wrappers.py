@@ -73,7 +73,10 @@ def test_patient_gives_up_after_max_attempts():
 
 
 def test_patient_gives_up_immediately_on_daily_quota():
+    from medrag.eval.llm_wrappers import QuotaExhausted
+
     inner = Scripted(LLMError("RateLimitError 429 requests per day: try again in 3h10m2s"), "never")
-    with pytest.raises(LLMError, match="daily"):
+    with pytest.raises(QuotaExhausted, match="daily") as info:
         PatientLLM(inner, sleep=lambda s: None).complete(MSGS)
+    assert not isinstance(info.value, LLMError)  # must not be swallowed as an ordinary LLM failure
     assert inner.calls == 1

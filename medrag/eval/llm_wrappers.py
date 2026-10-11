@@ -7,6 +7,12 @@ from typing import Callable
 
 from medrag.generation.llm import LLMClient, LLMError
 
+class QuotaExhausted(RuntimeError):
+    """Raised when the provider's daily quota is spent. Deliberately NOT an LLMError, so
+    the pipeline and judges do not turn it into a recorded failure: the run aborts and
+    resumes later from the cache."""
+
+
 _WAIT = re.compile(r"try again in (?:(\d+)h)?(?:(\d+)m)?(\d+(?:\.\d+)?)s", re.IGNORECASE)
 
 
@@ -84,7 +90,7 @@ class PatientLLM:
                     raise
                 wait = wait_seconds(message, self.default_wait)
                 if wait > self.max_wait:
-                    raise LLMError(
+                    raise QuotaExhausted(
                         f"Groq daily quota exhausted (asked to wait {wait / 60:.0f} min). "
                         f"Re-run later; finished work is cached. Original: {message}"
                     ) from exc

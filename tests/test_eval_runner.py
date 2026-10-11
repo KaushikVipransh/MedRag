@@ -83,3 +83,46 @@ def test_run_system_writes_and_resumes(tmp_path):
     again = run_system([OOS, IN], "medrag", Answerer(boom=True), FakeLLM(), no_passages, out, progress=lambda m: None)
     assert [r.id for r in again] == ["oos-001", "in-001"]
     assert load_results(out)[0].handled_ok is True
+
+
+def test_quota_exhaustion_aborts_the_run_without_saving_the_item(tmp_path):
+    from medrag.eval.llm_wrappers import QuotaExhausted
+
+    class Exhausted:
+        def answer(self, question, history=None, doc_ids=None):
+            raise QuotaExhausted("daily quota")
+
+    out = tmp_path / "medrag.jsonl"
+    with pytest.raises(QuotaExhausted):
+        run_system([IN], "medrag", Exhausted(), FakeLLM(), no_passages, out, progress=lambda m: None)
+    assert load_results(out) == []
+
+
+def test_rows_with_errors_are_retried_on_resume(tmp_path):
+    out = tmp_path / "medrag.jsonl"
+    failed = Answer("down", refused=True, refusal_reason="llm_error")
+    run_system([OOS], "medrag", Answerer(failed), FakeLLM(), no_passages, out, progress=lambda m: None)
+    ok = Answer("x", refused=True, refusal_reason="low_relevance")
+    again = run_system([OOS], "medrag", Answerer(ok), FakeLLM(), no_passages, out, progress=lambda m: None)
+    assert again[0].handled_ok is True and again[0].judge_errors == []
+
+
+def test_edited_item_is_re_evaluated(tmp_path):
+    out = tmp_path / "medrag.jsonl"
+    refused = Answer("x", refused=True, refusal_reason="low_relevance")
+    run_system([OOS], "medrag", Answerer(refused), FakeLLM(), no_passages, out, progress=lambda m: None)
+    edited = GoldItem("oos-001", "out_of_scope", "A different question?", "refuse")
+    answered = Answer("Two doses.", refused=False)
+    again = run_system([edited], "medrag", Answerer(answered), FakeLLM(), no_passages, out, progress=lambda m: None)
+    assert again[0].question == "A different question?" and again[0].handled_ok is False
+
+
+def test_config_change_invalidates_saved_rows(tmp_path):
+    out = tmp_path / "medrag.jsonl"
+    refused = Answer("x", refused=True, refusal_reason="low_relevance")
+    run_system([OOS], "medrag", Answerer(refused), FakeLLM(), no_passages, out, config="threshold=0.01",
+               progress=lambda m: None)
+    answered = Answer("Two doses.", refused=False)
+    again = run_system([OOS], "medrag", Answerer(answered), FakeLLM(), no_passages, out, config="threshold=0.12",
+                       progress=lambda m: None)
+    assert again[0].handled_ok is False

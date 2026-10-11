@@ -14,6 +14,9 @@ def summarize_system(results) -> dict:
     ins = [r for r in valid if r.category == "in_scope"]
     answered = [r for r in ins if not r.refused]
     graded = [r for r in answered if r.correctness is not None]
+    decided = [r for r in ins if r.refused or r.correctness is not None]  # judge errors excluded
+    with_gold = [r for r in answered if r.gold_pages]
+    refusals = [r for r in valid if r.refused]
 
     def handled(cat):
         return _share(r.handled_ok for r in valid if r.category == cat and r.handled_ok is not None)
@@ -23,7 +26,11 @@ def summarize_system(results) -> dict:
         "answer_rate": _share(not r.refused for r in ins),
         "correct": _share(r.correctness == "correct" for r in graded),
         "correct_or_partial": _share(r.correctness in ("correct", "partial") for r in graded),
-        "correct_overall": (sum(r.correctness == "correct" for r in ins) / len(ins)) if ins else None,
+        "correct_overall": _share(r.correctness == "correct" for r in decided),
+        "graded": len(graded),
+        "judge_errors": sum(bool(r.judge_errors) for r in valid),
+        "citation_hit": _share(set(r.cited_pages) & set(r.gold_pages) for r in with_gold),
+        "refusal_precision": _share(r.category != "in_scope" for r in refusals),
         "book_support": mean(r.book_support for r in answered),
         "citation_support": mean(r.citation_support for r in answered),
         "oos_refusal": handled("out_of_scope"),
@@ -34,6 +41,14 @@ def summarize_system(results) -> dict:
     }
 
 
+def paired_book_support(a, b) -> tuple[float | None, float | None, int]:
+    """Book support of two systems on the in-scope items both answered and both had judged."""
+    bs = {r.id: r.book_support for r in b if r.category == "in_scope" and r.book_support is not None}
+    pairs = [(r.book_support, bs[r.id]) for r in a
+             if r.category == "in_scope" and r.book_support is not None and r.id in bs]
+    return mean(x for x, _ in pairs), mean(y for _, y in pairs), len(pairs)
+
+
 def _pct(v) -> str:
     return "—" if v is None else f"{v * 100:.1f}%"
 
@@ -42,7 +57,7 @@ def _num(v, digits=3) -> str:
     return "—" if v is None else f"{v:.{digits}f}"
 
 
-def render_report(meta, systems=None, retrieval=None, calibration=None, consistency=None) -> str:
+def render_report(meta, systems=None, retrieval=None, calibration=None, consistency=None, paired=None) -> str:
     lines = []
     if meta.get("unverified_included"):
         lines += ["> **DRAFT** — this run includes gold items that have not been verified yet. "
@@ -53,22 +68,33 @@ def render_report(meta, systems=None, retrieval=None, calibration=None, consiste
 
     if systems:
         lines += ["## Answer quality", "",
-                  "| system | in-scope n | answered | correct (of answered) | correct or partial | correct (overall) "
-                  "| book support | citation support | OOS refused | near-miss ok | adversarial ok | median latency |",
-                  "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+                  "| system | in-scope n | answered | graded | correct (of graded) | correct or partial "
+                  "| correct (overall) | book support | citation support | cited gold page | OOS refused "
+                  "| refusal precision | near-miss ok | adversarial ok | judge errors | LLM errors |",
+                  "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
         for name, s in systems.items():
             lines.append(
-                f"| {name} | {s['n_in_scope']} | {_pct(s['answer_rate'])} | {_pct(s['correct'])} "
+                f"| {name} | {s['n_in_scope']} | {_pct(s['answer_rate'])} | {s['graded']} | {_pct(s['correct'])} "
                 f"| {_pct(s['correct_or_partial'])} | {_pct(s['correct_overall'])} | {_pct(s['book_support'])} "
-                f"| {_pct(s['citation_support'])} | {_pct(s['oos_refusal'])} | {_pct(s['near_miss_ok'])} "
-                f"| {_pct(s['adversarial_ok'])} | {_num(s['median_latency_s'], 1)} s |"
+                f"| {_pct(s['citation_support'])} | {_pct(s['citation_hit'])} | {_pct(s['oos_refusal'])} "
+                f"| {_pct(s['refusal_precision'])} | {_pct(s['near_miss_ok'])} | {_pct(s['adversarial_ok'])} "
+                f"| {s['judge_errors']} | {s['llm_errors']} |"
             )
-        lines += ["", "*Book support*: share of answer claims stated by the retrieved textbook passages "
-                  "(the same passages for both systems). *Citation support*: share of cited claims "
-                  "supported by the passages they cite.", ""]
+        lines += ["",
+                  "*Correct (overall)*: correct answers over in-scope items that were refused or graded "
+                  "(items whose judge failed are excluded and counted under judge errors). "
+                  "*Book support*: mean, over answered items, of the share of an answer's claims stated by "
+                  "the retrieved textbook passages (the same passages for both systems). "
+                  "*Citation support*: share of cited claims supported by the passages they cite. "
+                  "*Cited gold page*: answered items citing at least one gold page. "
+                  "*Refusal precision*: share of refusals that were for questions the book does not answer. "
+                  "*OOS refused* counts only explicit refusals.", ""]
+        if paired and paired.get("n"):
+            lines += [f"Paired book support on the {paired['n']} in-scope items both systems answered: "
+                      f"medrag **{_pct(paired.get('medrag'))}** vs no_rag **{_pct(paired.get('no_rag'))}**.", ""]
 
     if retrieval:
-        lines += ["## Retrieval (page-level, in-scope items)", "",
+        lines += ["## Retrieval (in-scope items; metrics over the top-k unique pages)", "",
                   "| variant | n | recall@1 | recall@5 | recall@10 | MRR | nDCG@5 |", "|---|---|---|---|---|---|---|"]
         for name, m in retrieval.items():
             lines.append(f"| {name} | {m['n']} | {_pct(m['recall@1'])} | {_pct(m['recall@5'])} "

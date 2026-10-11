@@ -3,7 +3,7 @@ import streamlit as st
 
 from medrag.config import Settings
 from medrag.eval.config import EvalSettings
-from medrag.eval.gold import CATEGORIES, EXPECTED, load_evidence, load_gold, save_gold
+from medrag.eval.gold import CATEGORIES, EXPECTED, load_evidence, load_gold, parse_pages, save_gold
 
 st.set_page_config(page_title="MedRAG gold review", page_icon="✅", layout="wide")
 cfg = EvalSettings.from_env()
@@ -56,28 +56,47 @@ if item.category == "in_scope":
     st.caption("Check: the answer key is correct per the book, the question is answerable from it, "
                "and the gold pages are where the answer is printed.")
 else:
-    st.caption("Check: the book really does not answer this (search it if unsure) and the expected behaviour fits.")
+    st.caption("Check: the book really does not answer this (search it if unsure) and the expected behaviour fits. "
+               "If the book does answer it, change the category to in_scope and add an answer key and pages.")
+
+FIELDS = ("question", "category", "expected", "answer_key", "pages", "notes")
+
+
+def next_item(advance: bool = False) -> None:
+    """Forget the widget values (they are keyed per field, not per item) and move on."""
+    for key in FIELDS:
+        st.session_state.pop(key, None)
+    if advance:
+        st.session_state.idx = idx + 1
+    st.rerun()
+
 
 with st.form(f"form-{item.id}"):
-    question = st.text_area("Question", item.question)
-    answer_key = st.text_area("Answer key", item.answer_key, disabled=item.category != "in_scope")
-    pages = st.text_input("Gold printed pages (comma-separated)", ", ".join(item.gold_pages))
-    expected = st.selectbox("Expected behaviour", EXPECTED, index=EXPECTED.index(item.expected))
-    notes = st.text_input("Notes", item.notes)
+    question = st.text_area("Question", item.question, key="question")
+    category = st.selectbox("Category", CATEGORIES, index=CATEGORIES.index(item.category), key="category")
+    expected = st.selectbox("Expected behaviour", EXPECTED, index=EXPECTED.index(item.expected), key="expected")
+    answer_key = st.text_area("Answer key (required for in_scope)", item.answer_key, key="answer_key")
+    pages = st.text_input("Gold printed pages (comma-separated)", ", ".join(item.gold_pages), key="pages")
+    notes = st.text_input("Notes", item.notes, key="notes")
     c1, c2, c3 = st.columns(3)
     verify = c1.form_submit_button("✅ Verify", key="verify")
     reject = c2.form_submit_button("🗑 Reject", key="reject")
     skip = c3.form_submit_button("Skip", key="skip")
 
 if verify:
-    item.question, item.answer_key, item.expected, item.notes = question.strip(), answer_key.strip(), expected, notes.strip()
-    item.gold_pages = [p.strip() for p in pages.split(",") if p.strip()]
-    item.verified = True
-    save_gold(cfg.gold_path, items)
-    st.rerun()
+    gold_pages, unknown = parse_pages(pages, {c.page_label for c in chunk_lookup().values()})
+    if category == "in_scope" and not answer_key.strip():
+        st.error("An in-scope item needs an answer key.")
+    elif unknown:
+        st.error(f"Unknown page label(s): {', '.join(unknown)}. Use printed page numbers exactly as the book shows them.")
+    else:
+        item.question, item.category, item.expected = question.strip(), category, expected
+        item.answer_key, item.notes, item.gold_pages = answer_key.strip(), notes.strip(), gold_pages
+        item.verified = True
+        save_gold(cfg.gold_path, items)
+        next_item()
 elif reject:
     save_gold(cfg.gold_path, [i for i in items if i.id != item.id])
-    st.rerun()
+    next_item()
 elif skip:
-    st.session_state.idx = idx + 1
-    st.rerun()
+    next_item(advance=True)

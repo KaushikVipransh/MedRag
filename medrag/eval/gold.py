@@ -55,6 +55,14 @@ def save_evidence(path: Path, evidence: dict[str, dict]) -> None:
     _write_jsonl(path, [{"id": k, **v} for k, v in evidence.items()])
 
 
+def parse_pages(text: str, known: set[str]) -> tuple[list[str], list[str]]:
+    """Split a comma-separated page list; return (pages, pages not among `known`).
+    With no known labels (index unavailable) nothing is flagged."""
+    pages = [p.strip() for p in text.split(",") if p.strip()]
+    unknown = [p for p in pages if known and p not in known]
+    return pages, unknown
+
+
 def select(
     items: list[GoldItem],
     include_unverified: bool,
