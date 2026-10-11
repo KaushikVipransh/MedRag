@@ -36,3 +36,26 @@ class FakeEmbedder:
 
     def count_tokens(self, text: str) -> int:
         return len(text.split())
+
+
+from medrag.retrieval.bm25 import tokenize  # noqa: E402
+
+
+class OverlapReranker:
+    """Score = fraction of query terms present in the passage."""
+
+    def score(self, query: str, texts: list[str]) -> list[float]:
+        terms = set(tokenize(query))
+        if not terms:
+            return [0.0] * len(texts)
+        return [len(terms & set(tokenize(t))) / len(terms) for t in texts]
+
+
+class FixedReranker:
+    """Returns a preset score per passage text substring; 0.0 otherwise."""
+
+    def __init__(self, scores: dict[str, float]):
+        self.scores = scores
+
+    def score(self, query: str, texts: list[str]) -> list[float]:
+        return [next((v for k, v in self.scores.items() if k in t), 0.0) for t in texts]
