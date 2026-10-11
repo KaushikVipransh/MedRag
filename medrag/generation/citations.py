@@ -3,7 +3,13 @@ import re
 from medrag.generation.prompts import REFUSAL_TOKEN
 
 _MARKER = re.compile(r"\[(\d+(?:\s*,\s*\d+)*)\]")
+# Reasoning models (e.g. gpt-oss) often cite as 【1】 or 【1†L1-L3】 instead of [1].
+_ALT_MARKER = re.compile(r"[【\[]\s*(\d+)\s*(?:†[^】\]]*)?[】\]]")
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?\]])\s+(?!\[)|\n+")
+
+
+def normalize_markers(text: str) -> str:
+    return _ALT_MARKER.sub(lambda m: f"[{m.group(1)}]", text)
 
 
 def _numbers(group: str) -> list[int]:

@@ -32,3 +32,10 @@ def test_refusal_detection():
     assert is_refusal("NOT_FOUND")
     assert is_refusal("  not_found\n")
     assert not is_refusal("Tinnitus is ringing [1].")
+
+
+def test_alternative_citation_styles_are_normalised():
+    from medrag.generation.citations import normalize_markers
+
+    text = "A【1】 B【2†L1-L3】 C[3†L4] D [1, 2]."
+    assert normalize_markers(text) == "A[1] B[2] C[3] D [1, 2]."

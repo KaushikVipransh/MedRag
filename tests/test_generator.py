@@ -68,3 +68,11 @@ def test_llm_failure_becomes_friendly_answer():
 def test_empty_llm_output_is_an_llm_error():
     ans = Generator(FakeLLM(["   "])).generate("q", chunks())
     assert ans.refused and ans.refusal_reason == "llm_error"
+
+
+def test_lenticular_citations_from_reasoning_models_count_as_citations():
+    llm = FakeLLM(["Tinnitus is a ringing sound that originates inside the patient【1†L1-L3】【2】."])
+    ans = Generator(llm).generate("q", chunks())
+    assert [c.marker for c in ans.citations] == [1, 2]
+    assert "【" not in ans.text
+    assert ans.warnings == []

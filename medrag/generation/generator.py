@@ -1,5 +1,6 @@
 from medrag.generation.citations import (
     is_refusal,
+    normalize_markers,
     parse_citations,
     remove_invalid_markers,
     uncited_sentences,
@@ -37,6 +38,7 @@ class Generator:
         if is_refusal(raw):
             return Answer(text=NOT_FOUND_MESSAGE, refused=True, refusal_reason="not_in_context", chunks=chunks)
 
+        raw = normalize_markers(raw)
         valid, invalid = parse_citations(raw, len(chunks))
         text = remove_invalid_markers(raw, len(chunks)).strip()
         warnings = []
