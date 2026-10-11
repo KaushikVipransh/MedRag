@@ -22,7 +22,7 @@ class Generator:
             {"role": "user", "content": build_user_message(question, chunks)},
         ]
         try:
-            raw = self.llm.complete(messages, temperature=self.temperature)
+            raw = self.llm.complete(messages, temperature=self.temperature, max_tokens=2048)
         except LLMError as exc:
             return Answer(
                 text=LLM_UNAVAILABLE_MESSAGE, refused=True, refusal_reason="llm_error",

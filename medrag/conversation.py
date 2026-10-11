@@ -17,7 +17,7 @@ def condense_question(llm: LLMClient, question: str, history: list[dict], max_tu
         {"role": "user", "content": f"Conversation:\n{transcript}\n\nLatest message: {question}"},
     ]
     try:
-        rewritten = llm.complete(messages, temperature=0.0, max_tokens=200).strip()
+        rewritten = llm.complete(messages, temperature=0.0, max_tokens=400).strip()
     except LLMError:
         return question
     return rewritten if 0 < len(rewritten) <= 500 else question

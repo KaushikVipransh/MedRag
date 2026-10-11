@@ -6,7 +6,7 @@ Grounded question answering over medical textbooks. Answers come only from the i
 
 1. **Ingestion** (`python -m medrag.ingest`): PyMuPDF extracts each page. Running headers and footers are removed and printed page numbers inferred. Sections come from the PDF outline. Pages are split into ≤200-token sentence-aligned chunks, embedded with all-MiniLM-L6-v2 and stored in Chroma.
 2. **Retrieval**: dense search and BM25 each return 30 candidates. These are fused with Reciprocal Rank Fusion and re-ranked by a cross-encoder; the top 5 are kept. If even the best passage scores below a threshold, MedRAG refuses without calling the LLM.
-3. **Generation**: LLaMA-3.3-70B on Groq answers from the numbered passages only and cites them as `[n]`. Citations to sources that don't exist are removed, and uncited sentences are flagged.
+3. **Generation**: gpt-oss-120b (open-weight) on Groq answers from the numbered passages only and cites them as `[n]`. Citations to sources that don't exist are removed, and uncited sentences are flagged.
 4. **Conversation**: follow-up questions are rewritten into standalone questions before retrieval.
 
 ## Setup
