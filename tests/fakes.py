@@ -59,3 +59,16 @@ class FixedReranker:
 
     def score(self, query: str, texts: list[str]) -> list[float]:
         return [next((v for k, v in self.scores.items() if k in t), 0.0) for t in texts]
+
+
+class FakeLLM:
+    def __init__(self, responses: list[str] | None = None, error: Exception | None = None):
+        self.responses = list(responses or [])
+        self.error = error
+        self.calls: list[list[dict]] = []
+
+    def complete(self, messages, temperature: float = 0.0, max_tokens: int = 1024) -> str:
+        self.calls.append(messages)
+        if self.error:
+            raise self.error
+        return self.responses.pop(0)
