@@ -24,3 +24,13 @@ def test_cross_encoder_prefers_relevant_passage():
          "The femur is the longest bone in the human body."],
     )
     assert 0.0 <= irrel < rel <= 1.0
+
+
+def test_build_pipeline_uses_injected_llm():
+    from medrag.config import Settings
+    from medrag.pipeline import build_pipeline
+    from tests.fakes import FakeLLM
+
+    fake = FakeLLM(["Tinnitus is a ringing sound [1]."])
+    rag = build_pipeline(Settings.from_env(), llm=fake)
+    assert rag.llm is fake and rag.generator.llm is fake
