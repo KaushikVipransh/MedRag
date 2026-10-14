@@ -47,3 +47,23 @@ See `docs/superpowers/specs/2026-10-11-medrag-v2-design.md`. Notes on the source
 ## Disclaimer
 
 Educational tool. Not medical advice.
+
+## Evaluation
+
+The evaluation harness lives in `medrag/eval/`. Every Groq call is cached in `data/eval_cache/`, so runs can be resumed. On the free tier (8k tokens/min per model), a full run takes roughly 1.5–2 hours.
+
+1. Draft the gold set (already done; it lives in `data/eval/gold.jsonl`):
+   `docker compose run --rm dev python -m medrag.eval draft --n 90`
+2. **Verify it.** Accept, edit or reject each item:
+   `docker compose run --rm --service-ports dev streamlit run review_gold.py --server.address 0.0.0.0`
+   (open http://localhost:8501)
+3. Run the evaluation on verified items and write the report:
+   ```bash
+   docker compose run --rm dev python -m medrag.eval retrieval --collections medrag,medrag_t128,medrag_t300
+   docker compose run --rm dev python -m medrag.eval calibrate
+   docker compose run --rm dev python -m medrag.eval run
+   docker compose run --rm dev python -m medrag.eval consistency
+   docker compose run --rm dev python -m medrag.eval report
+   ```
+
+Reports are written to `docs/results/`. A report built from unverified items is marked DRAFT. The chunk-size variant collections (`medrag_t128`, `medrag_t300`) are built with `MEDRAG_COLLECTION` and `MEDRAG_CHUNK_MAX_TOKENS` / `MEDRAG_CHUNK_OVERLAP_TOKENS` passed to `python -m medrag.ingest`.

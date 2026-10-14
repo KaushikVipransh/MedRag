@@ -27,7 +27,7 @@ def main() -> None:
     store = ChunkStore(settings.chroma_dir, settings.collection)
     embedder = SentenceTransformerEmbedder(settings.embed_model)
 
-    manifest_path = settings.chroma_dir / "manifest.json"
+    manifest_path = settings.chroma_dir / f"manifest-{settings.collection}.json"
     manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
 
     for pdf in pdfs:

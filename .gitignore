@@ -14,3 +14,5 @@ __pycache__/
 .pytest_cache/
 # executor scratch
 .superpowers/
+data/eval/evidence.jsonl
+data/eval_results/

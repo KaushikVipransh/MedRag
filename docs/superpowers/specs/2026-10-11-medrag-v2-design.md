@@ -115,3 +115,17 @@ data/chroma/           index (gitignored)
 - PDFs (book and paperwork) and `.env` are never committed. The book is copyrighted; the paperwork contains personal phone numbers.
 - No GPU assumed; all models must run on CPU.
 - Old evaluation numbers remain valid for v1 (tag `v1-paper`); v2 produces its own results table.
+
+## 8. Evaluation design decisions (added 2026-10-11, before Plan 2)
+
+- **Models.** Generator: `openai/gpt-oss-120b`; Groq retired `llama-3.3-70b-versatile`. Drafter and judge: `qwen/qwen3.8-27b`, a different model family from the generator, so the system under test never writes or grades its own questions. Both models are configurable.
+- **Groq free-tier limits** (measured): 8,000 tokens/min and 1,000 requests/day per model. Every LLM call in evaluation goes through a disk cache and a rate-limit waiter. Runs can be resumed, and a re-run costs nothing for calls already made.
+- **Relevance is page-level.** Gold labels are printed page numbers, not chunk ids, so retrieval metrics compare fairly across chunking variants.
+- **Gold set composition:**
+  - ~90 drafted in-scope items, expected to shrink to ~80 after review.
+  - 25 out-of-scope items (general medicine).
+  - 10 near-miss items (ENT-adjacent, mentioned in passing, or post-publication).
+  - 6 adversarial items (prompt injection, false premise).
+- **Workflow order (owner's decision).** Build all tooling first. The owner verifies the gold set afterwards in a review UI. Until then, runs require `--include-unverified`, and their reports are stamped DRAFT.
+- **What is committed:** `data/eval/gold.jsonl` (questions, answer keys, gold pages) and the reports in `docs/results/`. **What is not committed:** `data/eval/evidence.jsonl` (verbatim book quotes), the LLM cache, and per-item results.
+- **Book support.** For both the RAG system and the no-RAG baseline, the judge checks each answer claim against the same retrieved book passages. This makes "share of claims the book supports" comparable between the two.

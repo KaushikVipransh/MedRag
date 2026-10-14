@@ -48,7 +48,7 @@ class MedRAG:
         return answer
 
 
-def build_pipeline(settings: Settings) -> MedRAG:
+def build_pipeline(settings: Settings, llm: LLMClient | None = None) -> MedRAG:
     from medrag.embeddings import SentenceTransformerEmbedder
     from medrag.generation.llm import GroqClient
     from medrag.retrieval.bm25 import BM25Index
@@ -60,7 +60,7 @@ def build_pipeline(settings: Settings) -> MedRAG:
         raise RuntimeError(
             f"The index at {settings.chroma_dir} is empty. Run: python -m medrag.ingest data/sources"
         )
-    llm = GroqClient(settings.groq_api_key, settings.llm_model)
+    llm = llm or GroqClient(settings.groq_api_key, settings.llm_model)
     retriever = HybridRetriever(
         store=store,
         embedder=SentenceTransformerEmbedder(settings.embed_model),
