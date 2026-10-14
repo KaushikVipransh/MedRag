@@ -3,14 +3,11 @@ from medrag.retrieval.bm25 import BM25Index
 from medrag.retrieval.fusion import reciprocal_rank_fusion
 from medrag.retrieval.rerank import Reranker
 from medrag.store import ChunkStore
-from medrag.types import Chunk, RetrievedChunk
+from medrag.types import Chunk, RetrievedChunk, context_text
 
 
 def rerank_text(chunk: Chunk) -> str:
-    """Passage text as the cross-encoders see it: prefixed with its chapter title, which
-    supplies topic words the chunk itself may lack (e.g. a heading in the previous chunk)."""
-    title = chunk.section.split(" > ")[-1] if chunk.section else ""
-    return f"{title}: {chunk.text}" if title else chunk.text
+    return context_text(chunk)
 
 
 class HybridRetriever:

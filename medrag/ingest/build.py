@@ -14,8 +14,9 @@ from medrag.ingest.clean import (
 from medrag.ingest.labels import infer_page_labels
 from medrag.ingest.pdf import read_font_lines, read_pdf
 from medrag.ingest.sections import sections_from_fonts, sections_from_toc
+from medrag.ingest.topics import generic_headings, pretty, raw_headings
 from medrag.store import ChunkStore
-from medrag.types import Chunk
+from medrag.types import Chunk, context_text
 
 
 @dataclass
@@ -48,11 +49,19 @@ def build_chunks(
     is how image-only (scanned) pages look even when they carry a text overlay."""
     labels = infer_page_labels(pages_lines, pdf_labels)
     repeating = find_repeating_margin_lines(pages_lines)
+    bodies = [strip_margin_lines(lines, repeating) for lines in pages_lines]
+    generic = generic_headings(bodies)
     chunks: list[Chunk] = []
     pages_indexed = 0
     pages_without_text = 0
-    for i, lines in enumerate(pages_lines):
-        body = strip_margin_lines(lines, repeating)
+    topic, topic_section = "", None
+    for i, body in enumerate(bodies):
+        if sections[i] != topic_section:  # topics do not carry over chapter boundaries
+            topic, topic_section = "", sections[i]
+        page_start_topic = topic
+        heads = [h for h in raw_headings(body) if h not in generic]
+        if heads:
+            topic = pretty(heads[-1])
         text = lines_to_text(body)
         if len(text) < 100:
             pages_without_text += 1
@@ -62,7 +71,22 @@ def build_chunks(
         pieces = [p for p in chunk_text(text, count_tokens, max_tokens, overlap_tokens) if len(p) >= min_chars]
         if pieces:
             pages_indexed += 1
+        flat = " ".join(text.split())
+        marks, cursor = [], 0
+        for h in heads:
+            pos = flat.find(h, cursor)
+            if pos >= 0:
+                marks.append((pos, pretty(h)))
+                cursor = pos + len(h)
+        cursor = 0
         for n, piece in enumerate(pieces):
+            start = flat.find(" ".join(piece.split())[:60], cursor)
+            start = cursor if start < 0 else start
+            cursor = start
+            chunk_topic = page_start_topic
+            for pos, name in marks:
+                if pos <= start:
+                    chunk_topic = name
             chunks.append(
                 Chunk(
                     id=f"{doc_id}-p{i:04d}-c{n:03d}",
@@ -72,6 +96,7 @@ def build_chunks(
                     page_index=i,
                     page_label=labels[i],
                     section=sections[i],
+                    topic=chunk_topic,
                 )
             )
     return chunks, pages_indexed, pages_without_text
@@ -99,7 +124,7 @@ def ingest_pdf(
     )
     store.delete_document(doc_id)
     if chunks:
-        store.add(chunks, embedder.encode([c.text for c in chunks]))
+        store.add(chunks, embedder.encode([context_text(c) for c in chunks]))
     return IngestStats(
         doc_id=doc_id,
         title=title,

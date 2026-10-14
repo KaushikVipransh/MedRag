@@ -43,3 +43,17 @@ def test_all_requires_verified_items(env):
     save_gold(env / "gold.jsonl", [GoldItem("in-001", "in_scope", "q", "answer")])
     with pytest.raises(SystemExit, match="review_gold.py"):
         main(["all"])
+
+
+def test_ids_file_restricts_items(env):
+    import argparse
+
+    from medrag.eval.__main__ import _items
+    from medrag.eval.config import EvalSettings
+
+    save_gold(env / "gold.jsonl", [GoldItem("in-001", "in_scope", "q1", "answer", verified=True),
+                                   GoldItem("in-002", "in_scope", "q2", "answer", verified=True)])
+    ids = env / "ids.txt"
+    ids.write_text("# dev subset\nin-002\n")
+    args = argparse.Namespace(include_unverified=False, ids_file=str(ids))
+    assert [i.id for i in _items(EvalSettings.from_env(), args)] == ["in-002"]

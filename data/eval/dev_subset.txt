@@ -1,0 +1,49 @@
+# Development subset (40 items) for checking changes within Groq's free daily quota.
+# Biased on purpose: every item that failed in the 2026-10-14 baseline, plus regression guards.
+# Subset numbers are NOT comparable to full-set numbers.
+# baseline failures: refused / partial / incorrect
+in-008
+in-018
+in-022
+in-023
+in-030
+in-033
+in-036
+in-042
+in-051
+in-056
+in-060
+in-070
+in-074
+# baseline answers with unsupported claims
+in-002
+in-003
+in-076
+in-079
+in-089
+# regression guards (passed in baseline)
+in-001
+in-014
+in-029
+in-047
+in-064
+in-085
+# out of scope (incl. the highest-scoring ones)
+oos-001
+oos-003
+oos-012
+oos-015
+oos-018
+oos-024
+# near miss
+near-001
+near-008
+near-009
+oos-004
+oos-008
+oos-016
+# adversarial
+adv-001
+adv-002
+adv-003
+adv-006
