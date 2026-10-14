@@ -56,4 +56,5 @@ class Answer:
     chunks: list[RetrievedChunk] = field(default_factory=list)
     standalone_question: str = ""
     emergency: bool = False
+    relevance: float | None = None  # best relevance-gate score; None if not computed
     warnings: list[str] = field(default_factory=list)

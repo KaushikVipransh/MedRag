@@ -109,7 +109,8 @@ def cmd_run(args, settings, cfg):
 
     systems = {"medrag": rag, "no_rag": NoRagBaseline(gen, settings.temperature)}
     config = (f"generator={settings.llm_model};judge={cfg.judge_model};threshold={settings.rerank_threshold};"
-              f"top_n={settings.top_n};candidates={settings.candidates_per_retriever}")
+              f"top_n={settings.top_n};candidates={settings.candidates_per_retriever};"
+              f"rerank={settings.rerank_model};gate={settings.gate_model}")
     summaries, all_results = {}, {}
     for name in args.systems.split(","):
         results = run_system(items, name, systems[name], judge, passages_for,
@@ -130,8 +131,7 @@ def cmd_calibrate(args, settings, cfg):
     from medrag.pipeline import build_pipeline
 
     retriever = build_pipeline(settings).retriever
-    top = {i.id: (retriever.retrieve(i.question) or [None])[0] for i in items}
-    score = {k: (v.rerank_score if v else 0.0) for k, v in top.items()}
+    score = {i.id: (retriever.retrieve_with_relevance(i.question)[1] or 0.0) for i in items}
     dev, test = split_dev_test(items)
 
     def split_scores(group):

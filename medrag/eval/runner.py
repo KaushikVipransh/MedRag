@@ -61,7 +61,7 @@ def evaluate_item(
         retrieved_pages=[rc.chunk.page_label for rc in ans.chunks],
         cited_pages=_unique(c.chunk.page_label for c in ans.citations),
         gold_pages=list(item.gold_pages),
-        top_rerank=ans.chunks[0].rerank_score if ans.chunks else None,
+        top_rerank=ans.relevance if ans.relevance is not None else (ans.chunks[0].rerank_score if ans.chunks else None),
         latency_s=round(time.perf_counter() - started, 3),
     )
     if ans.refusal_reason == "llm_error":

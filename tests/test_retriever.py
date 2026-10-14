@@ -56,3 +56,34 @@ def test_doc_filter(parts):
     store, emb, bm25 = parts
     results = HybridRetriever(store, emb, bm25, OverlapReranker()).retrieve("hearing loss", doc_ids=["book-b"])
     assert results and all(r.chunk.doc_id == "book-b" for r in results)
+
+
+class RecordingReranker:
+    def __init__(self):
+        self.texts = []
+
+    def score(self, query, texts):
+        self.texts = list(texts)
+        return [0.5] * len(texts)
+
+
+def test_reranker_sees_the_chapter_title(parts):
+    store, emb, bm25 = parts
+    rec = RecordingReranker()
+    HybridRetriever(store, emb, bm25, rec).retrieve("tinnitus")
+    assert rec.texts and all(t.startswith("Ear: ") for t in rec.texts)
+
+
+def test_relevance_gate_scores_the_whole_candidate_pool(parts):
+    store, emb, bm25 = parts
+    gate = FixedReranker({"Mondini": 0.8})
+    retriever = HybridRetriever(store, emb, bm25, FixedReranker({"Tinnitus": 0.9}), top_n=1, gate=gate)
+    chunks, relevance = retriever.retrieve_with_relevance("tinnitus ear Mondini cochlea")
+    assert [c.chunk.id for c in chunks] == [CHUNKS[0].id]
+    assert relevance == 0.8
+
+
+def test_relevance_without_gate_is_the_top_rerank_score(parts):
+    store, emb, bm25 = parts
+    _, relevance = HybridRetriever(store, emb, bm25, FixedReranker({"Tinnitus": 0.9})).retrieve_with_relevance("tinnitus")
+    assert relevance == 0.9

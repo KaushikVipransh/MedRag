@@ -35,15 +35,15 @@ class MedRAG:
                 text=VAGUE_QUESTION_MESSAGE, refused=True, refusal_reason="invalid_input",
                 standalone_question=standalone, emergency=is_emergency(clean),
             )
-        chunks = self.retriever.retrieve(standalone, doc_ids)
+        chunks, relevance = self.retriever.retrieve_with_relevance(standalone, doc_ids)
 
-        best = chunks[0].rerank_score if chunks else None
-        if not chunks or (best is not None and best < self.settings.rerank_threshold):
+        if not chunks or (relevance is not None and relevance < self.settings.rerank_threshold):
             answer = Answer(text=NOT_FOUND_MESSAGE, refused=True, refusal_reason="low_relevance", chunks=chunks)
         else:
             answer = self.generator.generate(standalone, chunks)
 
         answer.standalone_question = standalone
+        answer.relevance = relevance
         answer.emergency = is_emergency(clean)
         return answer
 
@@ -68,5 +68,6 @@ def build_pipeline(settings: Settings, llm: LLMClient | None = None) -> MedRAG:
         reranker=CrossEncoderReranker(settings.rerank_model),
         candidates=settings.candidates_per_retriever,
         top_n=settings.top_n,
+        gate=CrossEncoderReranker(settings.gate_model) if settings.gate_model else None,
     )
     return MedRAG(retriever, Generator(llm, settings.temperature), llm, settings)

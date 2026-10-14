@@ -6,7 +6,18 @@ from medrag.store import ChunkStore
 from medrag.types import Chunk, RetrievedChunk
 
 
+def rerank_text(chunk: Chunk) -> str:
+    """Passage text as the cross-encoders see it: prefixed with its chapter title, which
+    supplies topic words the chunk itself may lack (e.g. a heading in the previous chunk)."""
+    title = chunk.section.split(" > ")[-1] if chunk.section else ""
+    return f"{title}: {chunk.text}" if title else chunk.text
+
+
 class HybridRetriever:
+    """Dense + BM25 candidates fused with RRF, ordered by `reranker`. An optional `gate`
+    cross-encoder scores the whole candidate pool; its best score is the question's
+    relevance, used to decide whether the book can answer at all."""
+
     def __init__(
         self,
         store: ChunkStore,
@@ -15,6 +26,7 @@ class HybridRetriever:
         reranker: Reranker | None,
         candidates: int = 30,
         top_n: int = 5,
+        gate: Reranker | None = None,
     ):
         self.store = store
         self.embedder = embedder
@@ -22,8 +34,14 @@ class HybridRetriever:
         self.reranker = reranker
         self.candidates = candidates
         self.top_n = top_n
+        self.gate = gate
 
     def retrieve(self, query: str, doc_ids: list[str] | None = None) -> list[RetrievedChunk]:
+        return self.retrieve_with_relevance(query, doc_ids)[0]
+
+    def retrieve_with_relevance(
+        self, query: str, doc_ids: list[str] | None = None
+    ) -> tuple[list[RetrievedChunk], float | None]:
         dense = self.store.query(self.embedder.encode([query])[0], self.candidates, doc_ids)
         sparse = self.bm25.search(query, self.candidates, doc_ids)
 
@@ -32,18 +50,20 @@ class HybridRetriever:
         fused = reciprocal_rank_fusion([[c.id for c, _ in dense], [c.id for c, _ in sparse]])
         ordered = sorted(fused, key=fused.get, reverse=True)[: self.candidates]
         if not ordered:
-            return []
+            return [], None
+
+        texts = [rerank_text(by_id[i]) for i in ordered]
+        relevance = max(self.gate.score(query, texts)) if self.gate is not None else None
 
         if self.reranker is None:
-            return [
-                RetrievedChunk(by_id[i], score=fused[i], rrf_score=fused[i])
-                for i in ordered[: self.top_n]
+            results = [RetrievedChunk(by_id[i], score=fused[i], rrf_score=fused[i]) for i in ordered]
+        else:
+            scores = self.reranker.score(query, texts)
+            results = [
+                RetrievedChunk(by_id[i], score=s, rrf_score=fused[i], rerank_score=s)
+                for i, s in zip(ordered, scores)
             ]
-
-        scores = self.reranker.score(query, [by_id[i].text for i in ordered])
-        results = [
-            RetrievedChunk(by_id[i], score=s, rrf_score=fused[i], rerank_score=s)
-            for i, s in zip(ordered, scores)
-        ]
-        results.sort(key=lambda r: r.score, reverse=True)
-        return results[: self.top_n]
+            results.sort(key=lambda r: r.score, reverse=True)
+            if relevance is None:
+                relevance = results[0].score
+        return results[: self.top_n], relevance

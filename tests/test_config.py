@@ -24,3 +24,15 @@ def test_env_overrides(monkeypatch):
 def test_missing_env_uses_defaults(monkeypatch):
     monkeypatch.delenv("MEDRAG_LLM_MODEL", raising=False)
     assert Settings.from_env(load_dotenv_file=False).llm_model == "openai/gpt-oss-120b"
+
+
+def test_retrieval_model_defaults():
+    s = Settings()
+    assert s.rerank_model == "BAAI/bge-reranker-base"
+    assert s.gate_model == "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    assert s.rerank_threshold == 0.06
+
+
+def test_gate_can_be_disabled(monkeypatch):
+    monkeypatch.setenv("MEDRAG_GATE_MODEL", "")
+    assert Settings.from_env(load_dotenv_file=False).gate_model == ""

@@ -11,12 +11,13 @@ class Settings:
     chroma_dir: Path = Path("data/chroma")
     collection: str = "medrag"
     embed_model: str = "sentence-transformers/all-MiniLM-L6-v2"
-    rerank_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    rerank_model: str = "BAAI/bge-reranker-base"  # orders passages
+    gate_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"  # decides answerability; "" disables
     chunk_max_tokens: int = 200
     chunk_overlap_tokens: int = 40
     candidates_per_retriever: int = 30
     top_n: int = 5
-    rerank_threshold: float = 0.01  # sigmoid relevance; calibrated in Plan 2
+    rerank_threshold: float = 0.06  # minimum gate relevance (sigmoid); calibrated on the verified gold set
     max_question_chars: int = 1000
 
     @classmethod
@@ -35,6 +36,7 @@ class Settings:
             collection=env("MEDRAG_COLLECTION", d.collection),
             embed_model=env("MEDRAG_EMBED_MODEL", d.embed_model),
             rerank_model=env("MEDRAG_RERANK_MODEL", d.rerank_model),
+            gate_model=env("MEDRAG_GATE_MODEL", d.gate_model),
             chunk_max_tokens=int(env("MEDRAG_CHUNK_MAX_TOKENS", d.chunk_max_tokens)),
             chunk_overlap_tokens=int(env("MEDRAG_CHUNK_OVERLAP_TOKENS", d.chunk_overlap_tokens)),
             candidates_per_retriever=int(env("MEDRAG_CANDIDATES", d.candidates_per_retriever)),
