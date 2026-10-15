@@ -122,3 +122,12 @@ def test_book_row_roundtrip():
     b = book()
     assert Book.from_row(b.to_row()) == b
     assert isinstance(b.to_row()["created_at"], str)
+
+
+def test_update_book_can_require_a_current_status(db):
+    db.insert_book(book())
+    assert db.update_book("alice", "b1", {"status": "ready"}, expect_status="failed") is False
+    assert db.get_book("alice", "b1").status == "processing"
+    assert db.update_book("alice", "b1", {"status": "ready"}, expect_status="processing") is True
+    assert db.get_book("alice", "b1").status == "ready"
+    assert db.update_book("bob", "b1", {"status": "failed"}) is False

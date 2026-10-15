@@ -90,8 +90,16 @@ class Library:
     def insert_chunks(self, user_id: str, chunks: list[Chunk], embeddings: list[list[float]]) -> None:
         self.db.insert_chunks([chunk_row(c, e, user_id) for c, e in zip(chunks, embeddings)])
 
-    def mark_ready(self, user_id: str, book_id: str, pages: int, chunks: int) -> None:
-        self.db.update_book(user_id, book_id, {"status": "ready", "pages": pages, "chunks": chunks, "progress": "", "error": ""})
+    def mark_ready(self, user_id: str, book_id: str, pages: int, chunks: int) -> bool:
+        """Only a book still 'processing' becomes ready: if another process failed it meanwhile
+        (startup sweep) or it was deleted, this returns False and the caller discards its chunks."""
+        return self.db.update_book(
+            user_id, book_id, {"status": "ready", "pages": pages, "chunks": chunks, "progress": "", "error": ""},
+            expect_status="processing",
+        )
+
+    def discard_chunks(self, user_id: str, book_id: str) -> None:
+        self.db.delete_chunks(user_id, book_id)
 
     def mark_failed(self, user_id: str, book_id: str, reason: str) -> None:
         self.db.delete_chunks(user_id, book_id)

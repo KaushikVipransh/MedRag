@@ -34,12 +34,14 @@ class MemoryDatabase:
         with self._lock:
             return sorted((b for b in self._books.values() if b.user_id == user_id), key=lambda b: b.created_at)
 
-    def update_book(self, user_id: str, book_id: str, changes: dict) -> None:
+    def update_book(self, user_id: str, book_id: str, changes: dict, expect_status: str | None = None) -> bool:
         check_update_fields(changes)
         with self._lock:
             book = self.get_book(user_id, book_id)
-            if book is not None:
-                self._books[book_id] = replace(book, **changes, updated_at=utc_now())
+            if book is None or (expect_status is not None and book.status != expect_status):
+                return False
+            self._books[book_id] = replace(book, **changes, updated_at=utc_now())
+            return True
 
     def delete_book(self, user_id: str, book_id: str) -> None:
         with self._lock:

@@ -30,6 +30,8 @@ Add to `.env`: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`, `MED
 
 With Supabase variables in `.env`, the app starts in multi-user mode. Set `MEDRAG_BACKEND=local` to get the single-book app back.
 
+Every app start (and the live test) marks books still being indexed as failed ("interrupted"), because each process assumes it owns the indexing queue. Pointing a local run at the production project therefore fails any upload the Space is indexing at that moment; prefer a separate Supabase project for local testing.
+
 ## 6. Create the Space
 1. At huggingface.co → **New Space**: SDK **Docker**, template **Blank**, hardware **CPU basic (free)**, visibility public or private.
 2. **Settings → Variables and secrets → New secret** for each: `GROQ_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`, `MEDRAG_FERNET_KEY`.

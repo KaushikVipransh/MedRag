@@ -99,3 +99,27 @@ def test_a_crashing_job_does_not_kill_the_worker_thread(parts, monkeypatch):
     assert worker.wait_idle(timeout=30)
     assert backend.db.get_book("alice", first.id).status == "failed"
     assert backend.db.get_book("alice", second.id).status == "ready"
+
+
+class SweepingEmbedder(FakeEmbedder):
+    """On its second batch, another process starts and sweeps every 'processing' book."""
+
+    def __init__(self, db):
+        self.db, self.calls = db, 0
+
+    def encode(self, texts):
+        self.calls += 1
+        if self.calls == 2:
+            self.db.fail_processing_books("interrupted")
+        return super().encode(texts)
+
+
+def test_a_sweep_mid_ingest_leaves_the_book_failed_with_no_chunks(parts):
+    backend, library = parts
+    book = library.add("alice", "", "a.pdf", make_pdf_bytes(BODIES))
+    IngestWorker(library, backend.storage, SweepingEmbedder(backend.db), SETTINGS, threaded=False, batch=1).run_one(
+        "alice", book.id
+    )
+    after = library.get("alice", book.id)
+    assert (after.status, after.error) == ("failed", "interrupted")
+    assert backend.db.load_chunks("alice", book.id) == []

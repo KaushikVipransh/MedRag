@@ -91,7 +91,15 @@ class IngestWorker:
             raise IngestFailed(NO_TEXT_MESSAGE)
         texts = [context_text(c) for c in chunks]
         for start in range(0, len(chunks), self.batch):
+            if not self._still_processing(user_id, book.id):
+                self.library.discard_chunks(user_id, book.id)
+                return
             self.library.set_progress(user_id, book.id, f"Indexing passages {start}/{len(chunks)}")
             part = slice(start, start + self.batch)
             self.library.insert_chunks(user_id, chunks[part], self.embedder.encode(texts[part]))
-        self.library.mark_ready(user_id, book.id, pages=stats.pages_total, chunks=len(chunks))
+        if not self.library.mark_ready(user_id, book.id, pages=stats.pages_total, chunks=len(chunks)):
+            self.library.discard_chunks(user_id, book.id)  # failed or deleted by someone else meanwhile
+
+    def _still_processing(self, user_id: str, book_id: str) -> bool:
+        current = self.library.get(user_id, book_id)
+        return current is not None and current.status == "processing"

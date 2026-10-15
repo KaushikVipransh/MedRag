@@ -75,10 +75,13 @@ class SupabaseDatabase:
         return [Book.from_row(r) for r in rows]
 
     @guard
-    def update_book(self, user_id: str, book_id: str, changes: dict) -> None:
+    def update_book(self, user_id: str, book_id: str, changes: dict, expect_status: str | None = None) -> bool:
         check_update_fields(changes)
         payload = {**changes, "updated_at": utc_now().isoformat()}
-        self._books().update(payload).eq("user_id", user_id).eq("id", book_id).execute()
+        query = self._books().update(payload).eq("user_id", user_id).eq("id", book_id)
+        if expect_status is not None:
+            query = query.eq("status", expect_status)
+        return bool(query.execute().data)  # PostgREST returns the updated rows
 
     @guard
     def delete_book(self, user_id: str, book_id: str) -> None:
