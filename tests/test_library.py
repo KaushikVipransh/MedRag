@@ -117,3 +117,8 @@ def test_fail_interrupted(backend):
     book = library.add("alice", "", "a.pdf", PDF)
     assert library.fail_interrupted() == 1
     assert library.get("alice", book.id).error == INTERRUPTED_MESSAGE
+
+
+def test_clean_title_drops_control_characters():
+    assert clean_title("Ear\x00 Book\x07", "x.pdf") == "Ear Book"
+    assert clean_title("", "Nose\x00Book.pdf") == "NoseBook"

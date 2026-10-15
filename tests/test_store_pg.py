@@ -47,3 +47,12 @@ def test_plugs_into_the_hybrid_retriever():
     retriever = HybridRetriever(store_of(chunks), FakeEmbedder(), BM25Index(chunks), OverlapReranker(), top_n=2)
     results = retriever.retrieve("what is tinnitus")
     assert results[0].chunk == chunks[0]
+
+
+def test_chunk_rows_never_carry_nul_characters():
+    """Postgres text columns reject \u0000, which broken PDF font encodings can emit."""
+    c = make_chunk(0, "Tinnitus\x00 is ringing", section="Ear\x00 > Tinnitus")
+    c = type(c)(**{**c.__dict__, "topic": "Tin\x00nitus"})
+    r = chunk_row(c, [1.0], user_id="alice")
+    assert all("\x00" not in v for v in r.values() if isinstance(v, str))
+    assert r["text"] == "Tinnitus is ringing" and r["topic"] == "Tinnitus"

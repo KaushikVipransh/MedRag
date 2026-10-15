@@ -3,6 +3,7 @@ loaded from the database once and searched here; dense search is brute-force cos
 takes milliseconds for a few thousand chunks."""
 import numpy as np
 
+from medrag.ingest.clean import strip_control
 from medrag.types import Chunk
 
 
@@ -11,11 +12,11 @@ def chunk_row(chunk: Chunk, embedding: list[float], user_id: str) -> dict:
         "id": chunk.id,
         "book_id": chunk.doc_id,
         "user_id": user_id,
-        "text": chunk.text,
+        "text": strip_control(chunk.text),
         "page_index": chunk.page_index,
-        "page_label": chunk.page_label,
-        "section": chunk.section,
-        "topic": chunk.topic,
+        "page_label": strip_control(chunk.page_label),
+        "section": strip_control(chunk.section),
+        "topic": strip_control(chunk.topic),
         "embedding": [round(float(x), 6) for x in embedding],
     }
 

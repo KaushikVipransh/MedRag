@@ -93,3 +93,10 @@ def test_recurring_subheading_that_also_appears_in_body_is_not_a_header():
 def test_bare_page_numbers_are_headers_even_if_numbers_appear_in_tables():
     pages = [["Title line", f"text {i}", "x", "y", "12", "34", "56", "a", "b", str(i + 1)] for i in range(6)]
     assert "#" in find_repeating_margin_lines(pages)
+
+
+def test_lines_to_text_drops_nul_and_control_characters():
+    from medrag.ingest.clean import lines_to_text
+
+    text = lines_to_text(["Tinnitus\x00 is ringing\x07 in the ear"])
+    assert "\x00" not in text and "\x07" not in text and "Tinnitus" in text

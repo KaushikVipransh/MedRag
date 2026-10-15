@@ -8,6 +8,7 @@ from typing import Callable
 
 from medrag.cloud.base import Backend, Book
 from medrag.config import CloudSettings
+from medrag.ingest.clean import strip_control
 from medrag.ingest.precheck import PdfCheck, PdfRejected, check_pdf
 from medrag.store_pg import chunk_row
 from medrag.types import Chunk
@@ -22,6 +23,7 @@ class UploadRejected(ValueError):
 
 
 def clean_title(title: str, filename: str) -> str:
+    title, filename = strip_control(title), strip_control(filename)
     cleaned = " ".join(title.split())
     if not cleaned:
         stem = PurePath(filename).stem if not filename.startswith(".") else ""
@@ -72,7 +74,7 @@ class Library:
         check = self.check_upload(user_id, data)
         book_id = self.new_id()
         book = Book(
-            id=book_id, user_id=user_id, title=clean_title(title, filename), filename=filename[:255],
+            id=book_id, user_id=user_id, title=clean_title(title, filename), filename=strip_control(filename)[:255],
             storage_path=f"{user_id}/{book_id}.pdf", size_bytes=len(data), pages=check.pages,
             status="processing", progress="Queued",
         )
