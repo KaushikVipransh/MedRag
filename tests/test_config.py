@@ -30,7 +30,7 @@ def test_retrieval_model_defaults():
     s = Settings()
     assert s.rerank_model == "BAAI/bge-reranker-base"
     assert s.gate_model == "cross-encoder/ms-marco-MiniLM-L-6-v2"
-    assert s.rerank_threshold == 0.06
+    assert s.rerank_threshold == 0.045
 
 
 def test_gate_can_be_disabled(monkeypatch):

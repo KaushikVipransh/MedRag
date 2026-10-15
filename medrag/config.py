@@ -17,7 +17,7 @@ class Settings:
     chunk_overlap_tokens: int = 40
     candidates_per_retriever: int = 30
     top_n: int = 5
-    rerank_threshold: float = 0.06  # minimum gate relevance (sigmoid); calibrated on the verified gold set
+    rerank_threshold: float = 0.045  # minimum gate relevance (sigmoid): weakest verified in-scope 0.057, strongest out-of-scope 0.037
     max_question_chars: int = 1000
 
     @classmethod
