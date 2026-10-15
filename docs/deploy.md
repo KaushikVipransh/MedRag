@@ -52,7 +52,7 @@ at that moment; prefer a separate Supabase project for local experiments.
 1. Sign in at share.streamlit.io with the GitHub account that owns the repository.
 2. **Create app → Deploy a public app from GitHub:** repository `<you>/MedRag`, branch
    `v3-multiuser` (or `main` once merged), main file `app.py`, and pick an app URL.
-3. **Advanced settings:** Python version **3.12**. Under **Secrets**, paste:
+3. **Advanced settings:** Python version **3.12** or **3.14** (both are pinned). Under **Secrets**, paste:
 
        GROQ_API_KEY = "..."
        SUPABASE_URL = "https://<project-ref>.supabase.co"
