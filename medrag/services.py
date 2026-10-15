@@ -65,3 +65,35 @@ def upload_book(services: Services, user_id: str, title: str, filename: str, dat
 
 def delete_book(services: Services, user_id: str, book_id: str) -> bool:
     return services.library.delete(user_id, book_id)
+
+
+def make_backend(cloud: CloudSettings) -> Backend:
+    if cloud.backend == "memory":
+        from medrag.cloud.memory import memory_backend
+
+        return memory_backend()
+    if cloud.backend == "supabase":
+        from medrag.cloud.supabase import supabase_backend
+
+        return supabase_backend(cloud.supabase_url, cloud.supabase_service_key, cloud.supabase_anon_key)
+    raise ValueError(f"MEDRAG_BACKEND must be 'memory' or 'supabase' for the multi-user app, not {cloud.backend!r}")
+
+
+def load_models(settings: Settings) -> Models:
+    from medrag.embeddings import SentenceTransformerEmbedder
+    from medrag.generation.llm import GroqClient
+    from medrag.retrieval.rerank import CrossEncoderReranker
+
+    return Models(
+        embedder=SentenceTransformerEmbedder(settings.embed_model),
+        reranker=CrossEncoderReranker(settings.rerank_model),
+        gate=CrossEncoderReranker(settings.gate_model) if settings.gate_model else None,
+        llm_factory=lambda api_key: GroqClient(api_key, settings.llm_model),
+    )
+
+
+def build_services(settings: Settings, cloud: CloudSettings) -> Services:
+    missing = cloud.missing()
+    if missing:
+        raise ValueError(f"Missing settings: {', '.join(missing)}")
+    return assemble(make_backend(cloud), load_models(settings), settings, cloud)
