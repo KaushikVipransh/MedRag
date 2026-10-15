@@ -89,3 +89,31 @@ def test_watermarked_image_only_page_is_reported(tmp_path, store):
     doc.close()
     stats = ingest_pdf(pdf, store, FakeEmbedder(), 50, 10)
     assert stats.pages_without_text == 1
+
+
+def test_chunks_carry_the_topic_heading_across_pages(tmp_path, store):
+    pdf = tmp_path / "topics.pdf"
+    bodies = [
+        "TREATMENT\nTreatment text one is here and long enough.\nMore words for the page body.\nAnd more words.",
+        "WEGENER'S GRANULOMATOSIS\nIt affects nose and kidneys.\nBiopsy shows granulomas here.\nMore body text.",
+        "Biopsy shows necrotizing vasculitis.\nErythrocyte sedimentation rate is raised.\nTREATMENT\nSteroids and cyclophosphamide.",
+        "TREATMENT\nTreatment text four is here and long enough.\nMore words for the page body.\nAnd more words.",
+    ]
+    make_pdf(pdf, bodies, toc=[[1, "Nose", 1]])
+    ingest_pdf(pdf, store, FakeEmbedder(), 50, 10)
+    third = [c for c in store.all_chunks() if c.page_index == 2]
+    assert third and all(c.topic == "Wegener's Granulomatosis" for c in third)
+
+
+from medrag.ingest.build import chunks_for_pdf
+from tests.fakes_cloud import make_pdf_bytes
+
+
+def test_chunks_for_pdf_reads_bytes_like_a_file(tmp_path):
+    data = make_pdf_bytes([EAR_1, EAR_2, NOSE_1, NOSE_2])
+    path = tmp_path / "book.pdf"
+    path.write_bytes(data)
+    from_bytes, stats = chunks_for_pdf(data, "b1", "Book", FakeEmbedder().count_tokens, 50, 10)
+    from_path, _ = chunks_for_pdf(path, "b1", "Book", FakeEmbedder().count_tokens, 50, 10)
+    assert from_bytes == from_path and stats.chunks == len(from_bytes) > 0
+    assert stats.pages_total == 4 and from_bytes[0].doc_id == "b1"

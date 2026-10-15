@@ -7,3 +7,7 @@ data
 .env
 __pycache__
 .pytest_cache
+tests
+docs
+legacy
+review_gold.py

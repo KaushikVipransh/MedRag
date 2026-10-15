@@ -25,8 +25,18 @@ def _cached_llm(settings: Settings, cfg: EvalSettings, model: str):
     return CachedLLM(PatientLLM(GroqClient(settings.groq_api_key, model)), model, cfg.cache_dir)
 
 
+def _read_ids(path: str | None) -> set[str] | None:
+    if not path:
+        return None
+    lines = Path(path).read_text(encoding="utf-8").splitlines()
+    return {l.strip() for l in lines if l.strip() and not l.lstrip().startswith("#")}
+
+
 def _items(cfg: EvalSettings, args, categories=None, limit=None):
     items = select(load_gold(cfg.gold_path), args.include_unverified, categories, limit)
+    ids = _read_ids(getattr(args, "ids_file", None))
+    if ids is not None:
+        items = [i for i in items if i.id in ids]
     if not items:
         raise SystemExit(UNVERIFIED_HELP)
     return items
@@ -109,7 +119,8 @@ def cmd_run(args, settings, cfg):
 
     systems = {"medrag": rag, "no_rag": NoRagBaseline(gen, settings.temperature)}
     config = (f"generator={settings.llm_model};judge={cfg.judge_model};threshold={settings.rerank_threshold};"
-              f"top_n={settings.top_n};candidates={settings.candidates_per_retriever}")
+              f"top_n={settings.top_n};candidates={settings.candidates_per_retriever};"
+              f"rerank={settings.rerank_model};gate={settings.gate_model}")
     summaries, all_results = {}, {}
     for name in args.systems.split(","):
         results = run_system(items, name, systems[name], judge, passages_for,
@@ -130,8 +141,7 @@ def cmd_calibrate(args, settings, cfg):
     from medrag.pipeline import build_pipeline
 
     retriever = build_pipeline(settings).retriever
-    top = {i.id: (retriever.retrieve(i.question) or [None])[0] for i in items}
-    score = {k: (v.rerank_score if v else 0.0) for k, v in top.items()}
+    score = {i.id: (retriever.retrieve_with_relevance(i.question)[1] or 0.0) for i in items}
     dev, test = split_dev_test(items)
 
     def split_scores(group):
@@ -220,6 +230,7 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--include-unverified", action="store_true")
     p.add_argument("--systems", default="medrag,no_rag")
     p.add_argument("--limit", type=int, default=None, help="max items per category")
+    p.add_argument("--ids-file", help="only evaluate the gold ids listed in this file (e.g. data/eval/dev_subset.txt)")
     p = sub.add_parser("calibrate", help="calibrate the refusal threshold")
     p.add_argument("--include-unverified", action="store_true")
     p.add_argument("--min-pass", type=float, default=0.98)

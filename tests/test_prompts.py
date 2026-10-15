@@ -17,3 +17,15 @@ def test_sources_are_numbered_with_page_and_section():
 def test_system_prompt_states_the_rules():
     assert REFUSAL_TOKEN in SYSTEM_PROMPT
     assert "[2]" in SYSTEM_PROMPT  # shows the citation format
+
+
+def test_system_prompt_forbids_elaboration_and_explains_source_headers():
+    assert "explanations" in SYSTEM_PROMPT and "own wording" in SYSTEM_PROMPT
+    assert "topic heading" in SYSTEM_PROMPT
+
+
+def test_source_header_includes_topic():
+    chunk = make_chunk(0, "Biopsy shows vasculitis.", page=178, section="Nose > Granulomas")
+    chunk = chunk.__class__(**{**chunk.__dict__, "topic": "Wegener's Granulomatosis"})
+    msg = build_user_message("q", [RetrievedChunk(chunk, score=0.9)])
+    assert "[1] (Book A, page 179, Nose > Granulomas > Wegener's Granulomatosis)" in msg

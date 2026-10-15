@@ -88,3 +88,19 @@ def test_stopword_follow_up_with_history_is_condensed_not_refused(tmp_path):
     history = [{"role": "user", "content": "Tell me about tinnitus"}, {"role": "assistant", "content": "Sure [1]."}]
     ans = make_rag(tmp_path, llm).answer("what is it?", history=history)
     assert not ans.refused
+
+
+def test_relevance_gate_decides_refusal(tmp_path):
+    store = ChunkStore(tmp_path / "db", "test")
+    emb = FakeEmbedder()
+    store.add(CHUNKS, emb.encode([c.text for c in CHUNKS]))
+    llm = FakeLLM()
+    retriever = HybridRetriever(store, emb, BM25Index(CHUNKS), OverlapReranker(), top_n=3, gate=FixedReranker({}))
+    ans = MedRAG(retriever, Generator(llm), llm, SETTINGS).answer("What is tinnitus?")
+    assert ans.refused and ans.refusal_reason == "low_relevance" and ans.relevance == 0.0
+    assert llm.calls == []
+
+
+def test_answer_records_relevance(tmp_path):
+    ans = make_rag(tmp_path, FakeLLM(["Tinnitus is a ringing sound [1]."])).answer("What is tinnitus?")
+    assert ans.relevance == 1.0

@@ -1,5 +1,6 @@
 # secrets
 .env
+.streamlit/secrets.toml
 # copyrighted / personal documents
 *.pdf
 # generated data

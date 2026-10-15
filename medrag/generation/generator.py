@@ -5,11 +5,20 @@ from medrag.generation.citations import (
     remove_invalid_markers,
     uncited_sentences,
 )
-from medrag.generation.llm import LLMClient, LLMError
+from medrag.generation.llm import LLMAuthError, LLMClient, LLMError, LLMRateLimited
 from medrag.generation.prompts import NOT_FOUND_MESSAGE, SYSTEM_PROMPT, build_user_message
 from medrag.types import Answer, Citation, RetrievedChunk
 
 LLM_UNAVAILABLE_MESSAGE = "The language model is unavailable right now. Please try again in a moment."
+LLM_FAILURE_REASONS = ("llm_error", "rate_limited", "key_rejected")
+
+
+def _failure_reason(exc: LLMError) -> str:
+    if isinstance(exc, LLMRateLimited):
+        return "rate_limited"
+    if isinstance(exc, LLMAuthError):
+        return "key_rejected"
+    return "llm_error"
 
 
 class Generator:
@@ -26,7 +35,7 @@ class Generator:
             raw = self.llm.complete(messages, temperature=self.temperature, max_tokens=2048)
         except LLMError as exc:
             return Answer(
-                text=LLM_UNAVAILABLE_MESSAGE, refused=True, refusal_reason="llm_error",
+                text=LLM_UNAVAILABLE_MESSAGE, refused=True, refusal_reason=_failure_reason(exc),
                 chunks=chunks, warnings=[str(exc)],
             )
 

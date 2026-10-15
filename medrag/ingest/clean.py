@@ -19,10 +19,16 @@ def _margin(lines: list[str], margin: int) -> list[str]:
     return lines[:margin] + lines[-margin:]
 
 
+def strip_control(text: str) -> str:
+    """Drop control characters except newline and tab. Broken PDF font encodings can emit NUL,
+    which Postgres text columns reject."""
+    return "".join(ch for ch in text if ch in "\n\t" or unicodedata.category(ch) != "Cc")
+
+
 def _normalize_chars(line: str) -> str:
-    """Expand ligatures (NFKC) and turn unassigned code points, which some PDFs emit
-    after bullet glyphs, into spaces."""
-    line = unicodedata.normalize("NFKC", line)
+    """Expand ligatures (NFKC), drop control characters and turn unassigned code points,
+    which some PDFs emit after bullet glyphs, into spaces."""
+    line = strip_control(unicodedata.normalize("NFKC", line))
     return "".join(" " if unicodedata.category(ch) == "Cn" else ch for ch in line)
 
 

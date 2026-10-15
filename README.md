@@ -1,6 +1,24 @@
+---
+title: MedRAG
+emoji: ⚕️
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # MedRAG
 
 Grounded question answering over medical textbooks. Answers come only from the indexed book, and every claim cites a numbered source with its printed page number and section.
+
+## Multi-user mode
+
+Anyone can sign up, upload their own medical textbook (a PDF with selectable text) and chat with it. Answers come only from that book, with page citations. See `docs/deploy.md` to run it for free on Streamlit Community Cloud with Supabase.
+
+- `MEDRAG_BACKEND=memory`: try multi-user mode locally with nothing saved.
+- With `SUPABASE_URL` set: multi-user mode on Supabase.
+- Neither: the original single-book app over the local Chroma index (used by the evaluation harness).
 
 ## How it works
 
