@@ -10,10 +10,16 @@ class RawDocument:
     title: str
 
 
-def read_pdf(path: Path) -> RawDocument:
+def _open(source: "Path | bytes"):
     import pymupdf
 
-    with pymupdf.open(str(path)) as doc:
+    if isinstance(source, (bytes, bytearray)):
+        return pymupdf.open(stream=bytes(source), filetype="pdf")
+    return pymupdf.open(str(source))
+
+
+def read_pdf(source: Path | bytes) -> RawDocument:
+    with _open(source) as doc:
         return RawDocument(
             pages_lines=[page.get_text("text").splitlines() for page in doc],
             pdf_labels=[page.get_label() for page in doc],
@@ -22,11 +28,9 @@ def read_pdf(path: Path) -> RawDocument:
         )
 
 
-def read_font_lines(path: Path) -> list[list[tuple[str, float]]]:
-    import pymupdf
-
+def read_font_lines(source: Path | bytes) -> list[list[tuple[str, float]]]:
     out: list[list[tuple[str, float]]] = []
-    with pymupdf.open(str(path)) as doc:
+    with _open(source) as doc:
         for page in doc:
             lines = []
             for block in page.get_text("dict")["blocks"]:

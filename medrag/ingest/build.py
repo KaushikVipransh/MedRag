@@ -102,6 +102,28 @@ def build_chunks(
     return chunks, pages_indexed, pages_without_text
 
 
+def chunks_for_pdf(
+    source: Path | bytes,
+    doc_id: str,
+    title: str,
+    count_tokens: Callable[[str], int],
+    max_tokens: int,
+    overlap_tokens: int,
+) -> tuple[list[Chunk], IngestStats]:
+    raw = read_pdf(source)
+    n_pages = len(raw.pages_lines)
+    sections = (
+        sections_from_toc(raw.toc, n_pages) if raw.toc else sections_from_fonts(read_font_lines(source))
+    )
+    chunks, pages_indexed, pages_without_text = build_chunks(
+        doc_id, title, raw.pages_lines, raw.pdf_labels, sections, count_tokens, max_tokens, overlap_tokens,
+    )
+    return chunks, IngestStats(
+        doc_id=doc_id, title=title, pages_total=n_pages, pages_indexed=pages_indexed,
+        pages_without_text=pages_without_text, chunks=len(chunks),
+    )
+
+
 def ingest_pdf(
     path: Path,
     store: ChunkStore,
@@ -111,25 +133,10 @@ def ingest_pdf(
     title: str | None = None,
 ) -> IngestStats:
     path = Path(path)
-    raw = read_pdf(path)
     doc_id = slugify(path.stem)
     title = title or path.stem.replace("_", " ").replace("-", " ").title()
-    n_pages = len(raw.pages_lines)
-    sections = (
-        sections_from_toc(raw.toc, n_pages) if raw.toc else sections_from_fonts(read_font_lines(path))
-    )
-    chunks, pages_indexed, pages_without_text = build_chunks(
-        doc_id, title, raw.pages_lines, raw.pdf_labels, sections,
-        embedder.count_tokens, max_tokens, overlap_tokens,
-    )
+    chunks, stats = chunks_for_pdf(path, doc_id, title, embedder.count_tokens, max_tokens, overlap_tokens)
     store.delete_document(doc_id)
     if chunks:
         store.add(chunks, embedder.encode([context_text(c) for c in chunks]))
-    return IngestStats(
-        doc_id=doc_id,
-        title=title,
-        pages_total=n_pages,
-        pages_indexed=pages_indexed,
-        pages_without_text=pages_without_text,
-        chunks=len(chunks),
-    )
+    return stats
