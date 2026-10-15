@@ -76,3 +76,16 @@ def test_lenticular_citations_from_reasoning_models_count_as_citations():
     assert [c.marker for c in ans.citations] == [1, 2]
     assert "【" not in ans.text
     assert ans.warnings == []
+
+
+from medrag.generation.llm import LLMAuthError, LLMRateLimited
+
+
+def test_rate_limit_becomes_rate_limited_refusal():
+    ans = Generator(FakeLLM(error=LLMRateLimited("RateLimitError: tokens per day"))).generate("q", chunks())
+    assert ans.refused and ans.refusal_reason == "rate_limited"
+
+
+def test_rejected_key_becomes_key_rejected_refusal():
+    ans = Generator(FakeLLM(error=LLMAuthError("AuthenticationError: invalid"))).generate("q", chunks())
+    assert ans.refused and ans.refusal_reason == "key_rejected"

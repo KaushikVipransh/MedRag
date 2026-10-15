@@ -5,6 +5,14 @@ class LLMError(RuntimeError):
     pass
 
 
+class LLMRateLimited(LLMError):
+    """Groq refused the request because a per-minute or daily limit was hit."""
+
+
+class LLMAuthError(LLMError):
+    """Groq rejected the API key."""
+
+
 class LLMClient(Protocol):
     def complete(self, messages: list[dict], temperature: float = 0.0, max_tokens: int = 1024) -> str: ...
 
@@ -24,5 +32,11 @@ class GroqClient:
                 model=self.model, messages=messages, temperature=temperature, max_tokens=max_tokens
             )
         except Exception as exc:  # network, auth, rate limit, model retired
-            raise LLMError(f"{type(exc).__name__}: {exc}") from exc
+            message = f"{type(exc).__name__}: {exc}"
+            name = type(exc).__name__
+            if name == "RateLimitError":
+                raise LLMRateLimited(message) from exc
+            if name in ("AuthenticationError", "PermissionDeniedError"):
+                raise LLMAuthError(message) from exc
+            raise LLMError(message) from exc
         return resp.choices[0].message.content or ""
