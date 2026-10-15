@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-15
 **Owner:** Vipransh Kaushik
-**Status:** Sections 1–2 approved in conversation; sections 3–7 drafted for review
+**Status:** Approved 2026-10-15; implementation plan docs/superpowers/plans/2026-10-15-medrag-multiuser.md
 **Builds on:** `2026-10-11-medrag-v2-design.md` (single-book v2, branch `v2-accuracy`)
 
 ## 0. Intent
@@ -92,7 +92,7 @@ New units, each with one job and a narrow interface:
 | Scanned or image-only PDF | Rejected before upload: *"This PDF has no text layer (it looks scanned). Upload a text-based PDF."* |
 | Encrypted, corrupt or non-PDF file | Rejected: *"This file couldn't be opened as a PDF."* |
 | Over a limit (books, size, pages, global cap) | Rejected, with the limit named and the current usage shown |
-| Ingestion crashes or the Space restarts mid-ingest | Rows still `processing` with no progress update for more than 15 minutes are marked `failed` ("interrupted"); partial chunks are deleted |
+| Ingestion crashes or the Space restarts mid-ingest | At startup, every book still `processing` is marked `failed` ("interrupted") and its partial chunks are deleted; a crash inside a job marks that book failed and the worker continues. |
 | Shared key hits Groq's own daily limit (`QuotaExhausted` / 429 with a long wait) | Fall back to the user's key if they have one; otherwise *"The free shared quota is used up for today. Add your free Groq key in Settings."* |
 | User's own key is invalid or exhausted | *"Your Groq key was rejected / has hit its daily limit"*, with a link to Settings. No silent fallback to the shared key beyond the user's cap |
 | Supabase unreachable or paused | A clear banner (*"Storage service is waking up / unavailable; try again in a minute"*); no traceback |
@@ -100,7 +100,7 @@ New units, each with one job and a narrow interface:
 
 ## 4. Security and privacy
 
-- **Secrets:** `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `GROQ_API_KEY` (shared) and `MEDRAG_FERNET_KEY` live only in Hugging Face Space secrets and a local `.env`, and are never committed.
+- **Secrets:** `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`, `GROQ_API_KEY` (shared) and `MEDRAG_FERNET_KEY` live only in Hugging Face Space secrets and a local `.env`, and are never committed.
 - **Service key handling:** the service-role key is used server-side only (Streamlit runs on the server and nothing is sent to the browser). Because it bypasses RLS, every data-access function takes an explicit `user_id`, and tests assert cross-user isolation. RLS policies still exist for any future anon-key access.
 - **Users' Groq keys:**
   - encrypted at rest with Fernet;
@@ -116,7 +116,7 @@ New units, each with one job and a narrow interface:
 
 ## 5. Deployment
 
-- **`Dockerfile.prod`** (Hugging Face Docker Space):
+- **`Dockerfile`** (Hugging Face Docker Space):
   - Python 3.12 slim with CPU-only torch;
   - the three models pre-downloaded at build time (MiniLM embedder, bge re-ranker, MiniLM gate) so a cold start doesn't download them;
   - runs `streamlit run app.py` on port 7860.
@@ -129,8 +129,8 @@ New units, each with one job and a narrow interface:
   5. add the secrets;
   6. push.
 - **Free-tier behaviour:**
-  - the Space sleeps when idle; the first request after sleep takes about 1 minute to load the models;
-  - Supabase pauses after 7 days without activity and wakes on the next request.
+  - the Space sleeps after 48 hours without visitors; the first request after sleep takes about 1 minute to load the models;
+  - Supabase pauses after 7 days without activity and must be restored from the dashboard (free).
 - **Local development** keeps the existing Docker setup. With no Supabase variables set, the app runs in **local mode**: a single built-in user, the Chroma store and the shared key only. All current tests and the evaluation harness keep working.
 
 ## 6. Capacity and limits (free tiers)
@@ -173,3 +173,14 @@ New units, each with one job and a narrow interface:
 - run the 40-item dev-subset check once the Groq quota resets.
 
 Both are done before the multi-user work starts.
+
+## 9. Changes made during planning
+
+- **Anon key added.** Sign-in uses a short-lived client built with `SUPABASE_ANON_KEY`, because signing in on the service-role client would replace its auth header. Sign-up uses the admin API (`auth.admin.create_user` with `email_confirm: True`), so no confirmation email is ever needed.
+- **Interrupted jobs are swept at startup, not after 15 minutes.** The queue lives in one process, so at process start every `processing` row is an orphan and is marked failed ("interrupted") immediately. A 15-minute timer would wrongly fail books that are merely queued behind a long ingestion.
+- **Database-size guard.** Besides the 60-book cap, uploads pause when Postgres reports more than 400 MB used (`database_bytes()` RPC), because chunk size varies between books.
+- **`Dockerfile`, not `Dockerfile.prod`.** Hugging Face Docker Spaces only build a file named `Dockerfile` at the repo root.
+- **Free-tier facts corrected:** a paused Supabase project does not wake on request; it is restored from the dashboard (free). A free Space sleeps after 48 hours without visitors.
+- **Two extra `books` columns:** `size_bytes` (for the 900 MB storage cap) and `updated_at`.
+- **`InMemoryChunkStore` is read-only** (`count`, `all_chunks`, `documents`, `query`); writes go through the `Database` contract. The retriever only needs `query`.
+- **Tests fake the contracts, not the Supabase client.** The in-memory backend is the fake; Supabase-specific code gets unit tests for its error mapping plus the live test.
