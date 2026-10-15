@@ -3,3 +3,7 @@ maxUploadSize = 50
 
 [browser]
 gatherUsageStats = false
+
+[client]
+# Users never see tracebacks or internal error text; details still go to the server log.
+showErrorDetails = "none"

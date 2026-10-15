@@ -14,7 +14,7 @@ Grounded question answering over medical textbooks. Answers come only from the i
 
 ## Multi-user mode
 
-Anyone can sign up, upload their own medical textbook (a PDF with selectable text) and chat with it. Answers come only from that book, with page citations. See `docs/deploy.md` to run it on a free Hugging Face Space with Supabase.
+Anyone can sign up, upload their own medical textbook (a PDF with selectable text) and chat with it. Answers come only from that book, with page citations. See `docs/deploy.md` to run it for free on Streamlit Community Cloud with Supabase.
 
 - `MEDRAG_BACKEND=memory`: try multi-user mode locally with nothing saved.
 - With `SUPABASE_URL` set: multi-user mode on Supabase.

@@ -158,3 +158,14 @@ def test_chat_failure_hides_internal_details(env, monkeypatch):
     at.chat_input[0].set_value("What is tinnitus?").run()
     assert not at.exception
     assert "Something went wrong while answering" in text_of(at) and "SECRET-DETAIL" not in text_of(at)
+
+
+def test_settings_can_come_from_streamlit_secrets(env, monkeypatch):
+    """Streamlit Community Cloud provides settings as st.secrets, not environment variables."""
+    services, _ = env
+    monkeypatch.delenv("MEDRAG_BACKEND", raising=False)  # also restores the env after the app sets it
+    at = AppTest.from_file(APP, default_timeout=30)
+    at.secrets["MEDRAG_BACKEND"] = "memory"
+    at.run()
+    assert not at.exception
+    assert at.button(key="login_submit") is not None

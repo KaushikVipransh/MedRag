@@ -184,3 +184,10 @@ Both are done before the multi-user work starts.
 - **Two extra `books` columns:** `size_bytes` (for the 900 MB storage cap) and `updated_at`.
 - **`InMemoryChunkStore` is read-only** (`count`, `all_chunks`, `documents`, `query`); writes go through the `Database` contract. The retriever only needs `query`.
 - **Tests fake the contracts, not the Supabase client.** The in-memory backend is the fake; Supabase-specific code gets unit tests for its error mapping plus the live test.
+
+## 10. Changes made during deployment (2026-10-16)
+
+- **Host changed to Streamlit Community Cloud.** Since mid-2026 Hugging Face no longer lets free accounts create Docker or Gradio Spaces on free CPU (402, "requires a PRO subscription"). Streamlit Community Cloud is free with no card and runs the same app from the GitHub repo. Measured memory with all three models loaded is about 1.4 GB (estimated 1.5–1.8 GB with a large book), within its 2.7 GB maximum but above its 690 MB guarantee. The app sleeps after 12 hours without visitors, and models are downloaded on a cold start rather than baked into an image. The `Dockerfile` remains for any Docker host.
+- **Settings may come from `st.secrets`.** `app.py` copies root-level Streamlit secrets into the environment (real environment variables win).
+- **CPU-only torch is pinned by direct wheel URL per platform** (x86_64 and aarch64) instead of an extra package index, so every installer (pip or uv) gets the CPU build without CUDA packages.
+- **Supabase region is US East**, next to the app server, because each question makes several database calls.

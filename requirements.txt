@@ -1,4 +1,3 @@
---extra-index-url https://download.pytorch.org/whl/cpu
 aiohappyeyeballs==2.7.1
 aiohttp-retry==2.9.1
 aiohttp==3.14.4
@@ -117,7 +116,8 @@ tenacity==9.2.1
 threadpoolctl==3.7.0
 tokenizers==0.23.3
 toml==0.10.2
-torch==2.14.1+cpu
+torch @ https://download.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl ; platform_machine == "x86_64"
+torch @ https://download.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp312-cp312-manylinux_2_28_aarch64.whl ; platform_machine == "aarch64"
 tqdm==4.70.1
 transformers==5.19.0
 typer==0.27.3
