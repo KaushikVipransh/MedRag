@@ -68,3 +68,34 @@ def test_build_services_reports_missing_settings():
 
     with pytest.raises(ValueError, match="SUPABASE_ANON_KEY"):
         build_services(Settings(), CloudSettings(backend="supabase", supabase_url="https://x"))
+
+
+from postgrest.exceptions import APIError
+from storage3.exceptions import StorageApiError
+
+
+@pytest.mark.parametrize("exc", [
+    APIError({"message": "JSON could not be generated", "code": 503, "hint": None, "details": "<html>"}),
+    APIError({"message": "Could not connect", "code": "PGRST001", "hint": None, "details": None}),
+    StorageApiError("upstream unavailable", "InternalError", 503),
+])
+def test_guard_maps_real_client_outages_to_unavailable(exc):
+    @guard
+    def call():
+        raise exc
+
+    with pytest.raises(BackendUnavailable):
+        call()
+
+
+@pytest.mark.parametrize("exc", [
+    APIError({"message": "violates foreign key constraint", "code": "23503", "hint": None, "details": None}),
+    StorageApiError("Object not found", "NoSuchKey", 404),
+])
+def test_guard_keeps_real_client_refusals_as_backend_errors(exc):
+    @guard
+    def call():
+        raise exc
+
+    with pytest.raises(BackendError):
+        call()

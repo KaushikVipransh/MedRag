@@ -128,3 +128,33 @@ def test_backend_outage_shows_banner(env, monkeypatch):
     at = app_as(services, user)
     assert not at.exception
     assert "waking up or unavailable" in text_of(at)
+
+
+def test_backend_error_shows_a_friendly_message_not_a_traceback(env, monkeypatch):
+    from medrag.cloud.base import BackendError
+
+    services, _ = env
+    user = services.accounts.sign_up("a@example.org", "password123")
+
+    def broken(user_id):
+        raise BackendError("APIError: relation books does not exist SECRET-DETAIL")
+
+    monkeypatch.setattr(services.library, "list", broken)
+    at = app_as(services, user)
+    assert not at.exception
+    assert "Something went wrong" in text_of(at) and "SECRET-DETAIL" not in text_of(at)
+
+
+def test_chat_failure_hides_internal_details(env, monkeypatch):
+    services, _ = env
+    user = services.accounts.sign_up("a@example.org", "password123")
+    ready_book(services, user.id)
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("SECRET-DETAIL from the database")
+
+    monkeypatch.setattr(services.chat, "ask", broken)
+    at = app_as(services, user)
+    at.chat_input[0].set_value("What is tinnitus?").run()
+    assert not at.exception
+    assert "Something went wrong while answering" in text_of(at) and "SECRET-DETAIL" not in text_of(at)

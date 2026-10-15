@@ -1,9 +1,11 @@
 """Multi-user MedRAG: accounts, a private library per user, and chat with one ready book."""
+import logging
+
 import streamlit as st
 
 from medrag import services as services_module
 from medrag.accounts import MIN_PASSWORD, AuthError
-from medrag.cloud.base import BackendUnavailable
+from medrag.cloud.base import BackendError, BackendUnavailable
 from medrag.config import CloudSettings, Settings
 from medrag.keys import KeyRejected
 from medrag.library import UploadRejected
@@ -11,7 +13,9 @@ from medrag.safety import DISCLAIMER
 from medrag.web.components import render_message_body
 
 UNAVAILABLE_MESSAGE = "The storage service is waking up or unavailable. Try again in a minute."
+ERROR_MESSAGE = "Something went wrong. Please try again in a moment."
 PAGES = ("Chat", "My library", "Settings")
+log = logging.getLogger(__name__)
 
 
 @st.cache_resource(show_spinner="Loading models… the first start takes about a minute.")
@@ -40,6 +44,9 @@ def run() -> None:
         {"Chat": chat_page, "My library": library_page, "Settings": settings_page}[page](s, user)
     except BackendUnavailable:
         st.warning(UNAVAILABLE_MESSAGE)
+    except BackendError:
+        log.exception("storage error")
+        st.error(ERROR_MESSAGE)
 
 
 def _enter(action) -> None:
@@ -105,9 +112,10 @@ def chat_page(s, user) -> None:
             except BackendUnavailable:
                 messages.pop()
                 raise
-            except Exception as exc:
+            except Exception:
+                log.exception("answering failed")
                 messages.pop()
-                st.error(f"Something went wrong while answering: {exc}")
+                st.error("Something went wrong while answering. Please try again.")
                 return
         messages.append({"role": "assistant", "content": answer.text, "answer": answer, "question": prompt})
         st.rerun()

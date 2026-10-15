@@ -33,9 +33,29 @@ def guard(fn):
                 raise BackendUnavailable(str(exc)) from exc
             raise BackendError(str(exc)) from exc
         except Exception as exc:
+            if _is_outage(exc):
+                raise BackendUnavailable(str(exc)) from exc
             raise BackendError(f"{type(exc).__name__}: {exc}") from exc
 
     return wrapper
+
+
+_PGRST_CONNECTION_CODES = {"PGRST000", "PGRST001", "PGRST002", "PGRST003"}  # database unreachable / starting
+
+
+def _is_outage(exc: Exception) -> bool:
+    """postgrest raises APIError for every non-2xx response (code = the HTTP status as an int
+    when the body isn't JSON, e.g. a gateway 5xx); storage3 raises StorageApiError with .status."""
+    code = getattr(exc, "code", None)
+    if isinstance(code, int):
+        return code >= 500
+    if code in _PGRST_CONNECTION_CODES:
+        return True
+    status = getattr(exc, "status", None)
+    try:
+        return status is not None and int(status) >= 500
+    except (TypeError, ValueError):
+        return False
 
 
 def auth_failure(exc: Exception) -> AuthFailed:

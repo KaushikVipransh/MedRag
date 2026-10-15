@@ -23,4 +23,4 @@ COPY --chown=user .streamlit .streamlit
 
 EXPOSE 7860
 # XSRF protection breaks file uploads inside the Hugging Face iframe.
-CMD ["streamlit", "run", "app.py", "--server.port=7860", "--server.address=0.0.0.0", "--server.enableXsrfProtection=false", "--server.enableCORS=false"]
+CMD ["streamlit", "run", "app.py", "--server.port=7860", "--server.address=0.0.0.0", "--server.enableXsrfProtection=false", "--server.enableCORS=false", "--client.showErrorDetails=none"]
