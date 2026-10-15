@@ -44,3 +44,60 @@ class Settings:
             rerank_threshold=float(env("MEDRAG_RERANK_THRESHOLD", d.rerank_threshold)),
             max_question_chars=int(env("MEDRAG_MAX_QUESTION_CHARS", d.max_question_chars)),
         )
+
+
+@dataclass(frozen=True)
+class CloudSettings:
+    """Multi-user settings. backend: "local" (single-book Chroma app), "memory" (multi-user,
+    nothing persisted; for development and tests) or "supabase" (production)."""
+
+    backend: str = "local"
+    supabase_url: str = ""
+    supabase_anon_key: str = ""
+    supabase_service_key: str = ""
+    fernet_key: str = ""
+    shared_daily_cap: int = 10
+    max_books_per_user: int = 3
+    max_pdf_mb: int = 50
+    max_pages: int = 1000
+    global_book_cap: int = 60
+    storage_cap_mb: int = 900
+    db_cap_mb: int = 400
+    cached_books: int = 4
+
+    @classmethod
+    def from_env(cls, load_dotenv_file: bool = True) -> "CloudSettings":
+        if load_dotenv_file:
+            from dotenv import load_dotenv
+
+            load_dotenv()
+        d = cls()
+        env = os.getenv
+        url = env("SUPABASE_URL", "")
+        return cls(
+            backend=env("MEDRAG_BACKEND", "") or ("supabase" if url else "local"),
+            supabase_url=url,
+            supabase_anon_key=env("SUPABASE_ANON_KEY", ""),
+            supabase_service_key=env("SUPABASE_SERVICE_KEY", ""),
+            fernet_key=env("MEDRAG_FERNET_KEY", ""),
+            shared_daily_cap=int(env("MEDRAG_SHARED_DAILY_CAP", d.shared_daily_cap)),
+            max_books_per_user=int(env("MEDRAG_MAX_BOOKS_PER_USER", d.max_books_per_user)),
+            max_pdf_mb=int(env("MEDRAG_MAX_PDF_MB", d.max_pdf_mb)),
+            max_pages=int(env("MEDRAG_MAX_PAGES", d.max_pages)),
+            global_book_cap=int(env("MEDRAG_GLOBAL_BOOK_CAP", d.global_book_cap)),
+            storage_cap_mb=int(env("MEDRAG_STORAGE_CAP_MB", d.storage_cap_mb)),
+            db_cap_mb=int(env("MEDRAG_DB_CAP_MB", d.db_cap_mb)),
+            cached_books=int(env("MEDRAG_CACHED_BOOKS", d.cached_books)),
+        )
+
+    def missing(self) -> list[str]:
+        """Names of required settings that are empty for the chosen backend."""
+        if self.backend != "supabase":
+            return []
+        required = {
+            "SUPABASE_URL": self.supabase_url,
+            "SUPABASE_ANON_KEY": self.supabase_anon_key,
+            "SUPABASE_SERVICE_KEY": self.supabase_service_key,
+            "MEDRAG_FERNET_KEY": self.fernet_key,
+        }
+        return [name for name, value in required.items() if not value]

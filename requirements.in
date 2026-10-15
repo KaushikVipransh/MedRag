@@ -8,3 +8,5 @@ groq
 python-dotenv
 streamlit
 pytest
+supabase
+cryptography
