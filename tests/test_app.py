@@ -28,6 +28,7 @@ class FakePipeline:
 
 @pytest.fixture
 def app(monkeypatch):
+    monkeypatch.setenv("MEDRAG_BACKEND", "local")
     import medrag.pipeline
 
     fake = FakePipeline()
