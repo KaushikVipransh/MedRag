@@ -1,3 +1,4 @@
+import threading
 from typing import Protocol
 
 
@@ -12,15 +13,20 @@ class SentenceTransformerEmbedder:
         from sentence_transformers import SentenceTransformer
 
         self._model = SentenceTransformer(model_name, device="cpu")
+        # One model serves the ingest thread and chat requests; HF fast tokenizers are not
+        # thread-safe ("Already borrowed"), so calls are serialised.
+        self._lock = threading.Lock()
 
     def encode(self, texts: list[str]) -> list[list[float]]:
-        vectors = self._model.encode(
-            texts,
-            batch_size=64,
-            normalize_embeddings=True,
-            show_progress_bar=len(texts) > 256,
-        )
+        with self._lock:
+            vectors = self._model.encode(
+                texts,
+                batch_size=64,
+                normalize_embeddings=True,
+                show_progress_bar=len(texts) > 256,
+            )
         return vectors.tolist()
 
     def count_tokens(self, text: str) -> int:
-        return len(self._model.tokenizer.tokenize(text))
+        with self._lock:
+            return len(self._model.tokenizer.tokenize(text))

@@ -1,3 +1,4 @@
+import threading
 from typing import Protocol
 
 
@@ -16,11 +17,12 @@ class CrossEncoderReranker:
         self._torch = torch
         self._tokenizer = AutoTokenizer.from_pretrained(model_name)
         self._model = AutoModelForSequenceClassification.from_pretrained(model_name).eval()
+        self._lock = threading.Lock()  # shared by concurrent chat requests; fast tokenizers are not thread-safe
 
     def score(self, query: str, texts: list[str]) -> list[float]:
         if not texts:
             return []
-        with self._torch.no_grad():
+        with self._lock, self._torch.no_grad():
             enc = self._tokenizer(
                 [query] * len(texts), texts,
                 padding=True, truncation=True, max_length=512, return_tensors="pt",
