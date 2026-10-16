@@ -3,14 +3,14 @@
 ## What this is
 A medical chatbot that answers only from a textbook, with page citations, and refuses rather than hallucinating. It is being turned into a free multi-user app: people sign up, upload their own medical textbook (a text PDF), and chat with it. The research paper (v1, NGNDAI2026) is secondary. The Dhingra ENT book is test data only.
 
-## Current state (2026-10-15)
-- Branch `v3-multiuser` (from `v2-accuracy`). Neither branch is pushed yet.
-- Spec (approved): `docs/superpowers/specs/2026-10-15-medrag-multiuser-design.md`
-- Plan: `docs/superpowers/plans/2026-10-15-medrag-multiuser.md` (Tasks 0–15)
-- **Next step:** execute the plan **natively** (the owner chose this) with `superpowers:executing-plans`, starting at Task 0. When all tasks are done, one fresh reviewer checks the whole branch.
-- Task 0 runs the 40-question dev-subset check, which needs Groq quota. If it aborts with `QuotaExhausted`, note that and continue; the run resumes later.
-- Task 15 Step 6 (creating the Supabase project and Hugging Face Space, pushing) is done **with the owner**, not alone.
-- Test baseline before the plan: 201 passed.
+## Current state (2026-10-17)
+- **Live:** https://medragbot.streamlit.app/ (Streamlit Community Cloud, deploys from `main`, Python 3.14). Supabase project `medrag`, region us-east-1. HF Docker Spaces are not used: since mid-2026 they need PRO.
+- v3 plan (Tasks 0–15) is built, reviewed and merged to `main` (PR #3). `v3-multiuser` carries later doc commits not yet on `main`.
+- Deploy record: `docs/notes/deploy-check.md`; guide: `docs/deploy.md`.
+- Full evaluation (129 verified questions, threshold 0.045): in-scope 92.1% correct of graded; out-of-scope, near-miss and adversarial 100% (`docs/results/2026-10-16-evaluation.md`).
+- `.env` has `MEDRAG_BACKEND=local` so local runs never touch production; use `-e MEDRAG_BACKEND=supabase` only for the live test.
+- Deferred minor issues are listed in PR #3. Tests: 335 passed.
+- Docker Desktop on this host crashes during long jobs; restart it with `%LOCALAPPDATA%\Programs\DockerDesktop\Docker Desktop.exe`.
 
 ## How to run things
 - The host is Windows ARM64 with Smart App Control ON, which blocks native scipy/grpc DLLs. **Run everything in Docker:** `docker compose run --rm dev <command>`. Never suggest a native Windows venv.
